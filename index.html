@@ -130,6 +130,20 @@ svg.ch{width:100%;display:block}
 .feel button{flex:1;min-height:44px;background:#070707;border:1px solid var(--line);border-radius:6px;font-family:var(--m);color:var(--dim)}
 .feel button.on{border-color:var(--blue);color:var(--blue);background:#0a1828}
 .spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+body.ob #tabbar,body.ob #sync,body.ob #av{display:none}
+body.ob .view{bottom:0}
+.obh{font-size:22px;color:#fff;line-height:1.25;margin:4px 0 6px}
+.obp{color:var(--dim);font-size:14px;line-height:1.5;margin-bottom:16px}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:54px;padding:11px 14px;margin-bottom:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:#fff;font-size:15px;text-align:left}
+.opt small{display:block;color:var(--dim);font-size:12px;margin-top:2px}
+.opt.on{border-color:var(--blue);background:#0a1828}
+.opt.on:after{content:'✓';color:var(--blue);font-weight:700}
+.chips{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.chips button{min-height:50px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--dim);font-size:11px;letter-spacing:.06em;padding:0}
+.chips button.on{border-color:var(--blue);color:var(--blue);background:#0a1828}
+.stp{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--panel)}
+input[type=date]{-webkit-appearance:none;appearance:none;min-height:44px;display:block}
+select{min-height:44px}
 
 </style>
 </head>
@@ -194,6 +208,11 @@ async function api(path,opt={}){
   const t=await r.text();return t?JSON.parse(t):null;
 }
 let D=LS.get('data',{athlete:null,acts:[],well:[],at:0});
+// treinos marcados como feitos à mão que não chegaram a ser gravados no Intervals
+let MAN=LS.get('man',[]);
+const isMan=a=>String(a.id).startsWith('man-');
+const withMan=acts=>acts.filter(a=>!isMan(a)).concat(MAN).sort((a,b)=>a.date<b.date?1:-1);
+D.acts=withMan(D.acts||[]);
 let AX=LS.get('ax4',{}); // análise por atividade: splits, best efforts, deriva
 const slim=a=>({id:a.id,date:a.start_date_local,type:a.type,name:a.name,dist:a.distance,mov:a.moving_time,el:a.elapsed_time,hr:a.average_heartrate,hrmax:a.max_heartrate,load:a.icu_training_load,trimp:a.trimp,elev:a.total_elevation_gain,cad:a.average_cadence,rpe:a.icu_rpe,feel:a.feel,speed:a.average_speed,src:a.source});
 
@@ -205,7 +224,7 @@ async function sync(full){
     D={athlete:{name:ath.name,pic:ath.profile_medium,rhr:ath.icu_resting_hr,weight:ath.icu_weight,city:ath.city,
         gAct:ath.icu_garmin_sync_activities,gWell:ath.icu_garmin_download_wellness,gUp:ath.icu_garmin_upload_workouts,
         run:(ath.sportSettings||[]).find(s=>(s.types||[]).includes('Run'))||null},
-      acts:(acts||[]).filter(a=>a.type).map(slim).sort((a,b)=>a.date<b.date?1:-1),
+      acts:withMan((acts||[]).filter(a=>a.type).map(slim)),
       well:(well||[]).map(w=>({d:w.id,rhr:w.restingHR,sleep:w.sleepSecs,ss:w.sleepScore,hrv:w.hrv,vo2:w.vo2max,steps:w.steps,feel:w.fatigue})),
       ev:(evs||[]).filter(e=>e.category==='WORKOUT').map(e=>({id:e.id,d:e.start_date_local.slice(0,10),name:e.name})),
       at:Date.now()};
@@ -219,7 +238,7 @@ async function sync(full){
 /* streams → parciais por km, melhores esforços, deriva cardíaca */
 const BE=[[1000,'1 KM'],[3000,'3 KM'],[5000,'5 KM'],[10000,'10 KM'],[21097.5,'21 KM'],[30000,'30 KM'],[42195,'42 KM']];
 async function analyzeRuns(full){
-  const runs=D.acts.filter(isRun).filter(a=>full||!AX[a.id]).slice(0,60);
+  const runs=D.acts.filter(isRun).filter(a=>!isMan(a)&&(full||!AX[a.id])).slice(0,60);
   for(const a of runs){
     try{
       const s=await api(`/activity/${a.id}/streams?types=time,distance,heartrate,velocity_smooth,altitude`);
@@ -323,14 +342,14 @@ function readiness(dt){
 /* ================= plano (microciclos) ================= */
 // passos: [tipo, duração, ritmo seg/km [min,max] ou null, repetições]
 const EZ=[370,390],LONG=[360,390];
-function planTemplate(){
+function planIgor(){
   const P=[];const add=(d,o)=>P.push({date:d,...o});
   add('2026-11-01',{tipo:'longo',titulo:'Longão de abertura',km:6,steps:[['Contínuo','6km',LONG]]});
   const wk=[
     {q:{titulo:'Tiros curtos 6×200 m',km:4.5,steps:[['Aquecer','1.5km',EZ],['Tiro','200m',[205,215],6],['Rec.','200m',[400,440],6],['Desaquecer','1.5km',EZ]]},e:5,l:7},
-    {q:{titulo:'Ritmo 3×1 km',km:6,steps:[['Aquecer','1.5km',EZ],['Ritmo','1km',[295,305],3],['Rec.','2m',[400,450],3],['Desaquecer','1.5km',EZ]]},e:5,l:8},
-    {q:{titulo:'Limiar 2×2 km',km:7,steps:[['Aquecer','1.5km',EZ],['Limiar','2km',[305,315],2],['Rec.','3m',[400,450],2],['Desaquecer','1.5km',EZ]]},e:5,l:9,lt:'9 km, os 3 finais a 5:30'},
-    {q:{titulo:'Soltura com 4 acelerações',km:5,steps:[['Contínuo','4km',EZ],['Aceleração','100m',[240,260],4],['Rec.','1m',null,4]]},e:4,l:10,lt:'OBJETIVO 10 km a 5:15–5:30',alvo:1},
+    {q:{titulo:'Ritmo 3×1 km',km:6,steps:[['Aquecer','1.5km',EZ],['Ritmo','1km',[295,305],3],['Rec.','2min',[400,450],3],['Desaquecer','1.5km',EZ]]},e:5,l:8},
+    {q:{titulo:'Limiar 2×2 km',km:7,steps:[['Aquecer','1.5km',EZ],['Limiar','2km',[305,315],2],['Rec.','3min',[400,450],2],['Desaquecer','1.5km',EZ]]},e:5,l:9,lt:'9 km, os 3 finais a 5:30'},
+    {q:{titulo:'Soltura com 4 acelerações',km:5,steps:[['Contínuo','4km',EZ],['Aceleração','100m',[240,260],4],['Rec.','1min',null,4]]},e:4,l:10,lt:'OBJETIVO 10 km a 5:15–5:30',alvo:1},
   ];
   wk.forEach((w,i)=>{
     const m=addD(parseD('2026-11-02'),i*7);
@@ -341,7 +360,59 @@ function planTemplate(){
   });
   return P;
 }
-function plan(){const ov=LS.get('ov',{});return planTemplate().map(p=>ov[p.date]?{...p,...ov[p.date]}:p)}
+/* plano gerado pelo questionário (todo atleta que não é o Igor) */
+let PF=LS.get('pf',null);
+const isIgor=()=>CFG.athlete==='i504491';
+const hasWatch=()=>isIgor()||!!(PF&&PF.relogio==='garmin');
+const META={c:{n:'Constância',sem:8,d:0},5:{n:'5 km',sem:8,d:5,dist:5000},10:{n:'10 km',sem:10,d:10,dist:10000},21:{n:'Meia maratona',sem:16,d:21.1,dist:21097.5}};
+const r5=x=>Math.round(x*2)/2;
+const kmTxt=x=>String(x).replace('.',',');
+function zonesFor(V){const Z=paceZones(V||32),o={};for(const k in Z)o[k]=[Math.round(Z[k][0]),Math.round(Z[k][1])];return o}
+function quality(q,f,dl,Z){const E=Z.E,rec=[E[1]+30,E[1]+60];
+  if(dl||f<0.25){const c=r5(Math.max(2,q-1));return {tipo:'qualidade',titulo:'Rodagem com 6 acelerações',km:r5(c+1),steps:[['Contínuo',c+'km',E],['Aceleração','100m',Z.R,6],['Rec.','1min',null,6]]}}
+  if(f<0.5){const n=clamp(Math.round((q-3)/0.6),4,10);return {tipo:'qualidade',titulo:`Tiros ${n}×400 m`,km:r5(3+n*0.6),steps:[['Aquecer','1.5km',E],['Tiro','400m',Z.I,n],['Rec.','200m',rec,n],['Desaquecer','1.5km',E]]}}
+  if(f<0.75){const n=clamp(Math.round(q-3),2,5);return {tipo:'qualidade',titulo:`Ritmo ${n}×1 km`,km:3+n,steps:[['Aquecer','1.5km',E],['Ritmo','1km',Z.T,n],['Rec.','2min',null,n],['Desaquecer','1.5km',E]]}}
+  const x=r5(clamp(q-2.5,2,6));return {tipo:'qualidade',titulo:`Limiar contínuo ${kmTxt(x)} km`,km:x+2.5,steps:[['Aquecer','1.5km',E],['Limiar',x+'km',Z.T],['Desaquecer','1km',E]]};
+}
+// quem ainda não corre começa no corre e caminha: [minutos correndo, minutos caminhando]
+const RW=[[1,2],[2,2],[3,2],[5,1],[8,1]];
+function genPlan(pf){
+  const Z=zonesFor(pf.V),E=Z.E,M=META[pf.meta]||META.c,novo=!pf.km0,P=[];
+  const dias=[...pf.dias].sort((a,b)=>(a+6)%7-(b+6)%7),outros=dias.filter(d=>d!==pf.longo),k=outros.length;
+  // se já passaram todos os dias de treino da semana de início, a semana 1 é a seguinte
+  const ini=parseD(pf.inicio),N=M.sem+(novo&&M.d>=10?RW.length:0),m0=addD(monday(ini),(ini.getDay()+6)%7>(dias[dias.length-1]+6)%7?7:0);
+  let W=Math.max(pf.km0,dias.length*3),L=Math.max(3,pf.L0||0);
+  const capL=M.d?Math.max(L,M.d>21?19:M.d+1):L+3,pico=Math.min(M.d?Math.max(W,{5:20,10:30,21:45}[pf.meta]):W*1.3,Math.max(W,capL+k*9));
+  for(let w=0;w<N;w++){
+    const add=(d,o)=>{const ds=ymd(addD(m0,7*w+(d+6)%7));if(ds>=pf.inicio)P.push({date:ds,...o})};
+    if(M.d&&w===N-1){ // semana da prova: só rodagens curtas antes do dia D
+      outros.filter(d=>(d+1)%7!==pf.longo).forEach(d=>add(d,{tipo:'rodagem',titulo:'Rodagem curta',km:3,steps:[['Contínuo','3km',E]]}));
+      const rp=Math.round(predict(pf.V,M.dist)/M.d);
+      add(pf.longo,{tipo:'prova',titulo:'DIA D: '+M.n,km:M.d,steps:[['Contínuo',M.d+'km',[rp,rp+15]]]});
+      break;
+    }
+    if(novo&&w<RW.length){const [c,cw]=RW[w];
+      dias.forEach(d=>{const lg=d===pf.longo,rp=Math.round(30/(c+cw))+(lg?1:0);add(d,{tipo:lg?'longo':'rodagem',titulo:`Corre ${c} min, caminha ${cw} (${rp}×)`,km:r5(rp*(c*60/E[1]+cw/10)),steps:[['Corre',c+'min',E,rp],['Caminhada',cw+'min',null,rp]]})});
+      if(w===RW.length-1){W=dias.length*3;L=4}
+      continue;
+    }
+    const dl=w>0&&(w+1)%4===0,Wk=dl?W*0.8:W,Lk=r5(dl?Math.max(3,L-2):L),resto=Math.max(0,Wk-Lk);
+    const qs=k?quality(r5(clamp(resto/k*1.15,3,10)),novo?0:w/N,dl,Z):null,e=k>1?r5(clamp((resto-qs.km)/(k-1),3,10)):0;
+    add(pf.longo,{tipo:'longo',titulo:'Longão '+kmTxt(Lk)+' km',km:Lk,steps:[['Contínuo',Lk+'km',E]]});
+    outros.forEach((d,i)=>add(d,i===0?qs:{tipo:'rodagem',titulo:'Rodagem leve',km:e,steps:[['Contínuo',e+'km',E]]}));
+    if(!dl){W=Math.min(W*1.08,pico);L=Math.min(L+(M.d>21?1.5:1),capL)}
+  }
+  return P;
+}
+const baseTemplate=()=>isIgor()?planIgor():PF?genPlan(PF):[];
+// treinos criados ou editados à mão ficam em 'extra' e substituem o do dia ({off:1} = dia sem treino)
+let _pk='',_pv=[];
+function plan(){
+  const ov=LS.get('ov',{}),ex=LS.get('extra',{}),key=CFG.athlete+JSON.stringify(PF)+JSON.stringify(ov)+JSON.stringify(ex);
+  if(key===_pk)return _pv;
+  _pv=baseTemplate().filter(p=>!ex[p.date]).concat(Object.values(ex).filter(x=>!x.off)).map(p=>ov[p.date]?{...p,...ov[p.date]}:p).sort((a,b)=>a.date<b.date?-1:1);
+  _pk=key;return _pv;
+}
 const planOn=ds=>plan().find(p=>p.date===ds);
 const evOn=ds=>(D.ev||[]).find(e=>e.d===ds);
 const runsOn=ds=>D.acts.filter(a=>isRun(a)&&a.date.slice(0,10)===ds);
@@ -362,7 +433,9 @@ function adjust(p,r){
 // texto no formato de treino do Intervals.icu (vai para o Garmin)
 function toIcu(p){
   const pz=r=>r?(fmtP(Math.min(...r))+'-'+fmtP(Math.max(...r))+'/km Pace'):'Z1 HR';
-  let out='',i=0;const st=p.steps;
+  // no Intervals "m" é minuto e metro é "mtr"
+  const du=x=>/min$/.test(x)?x.replace(/min$/,'m'):/\dm$/.test(x)?x.replace(/m$/,'mtr'):x;
+  let out='',i=0;const st=p.steps.map(s=>{const c=[...s];c[1]=du(s[1]);return c});
   while(i<st.length){
     const s=st[i];
     if(s[3]&&st[i+1]&&st[i+1][3]===s[3]){out+=`\n${s[3]}x\n- ${s[1]} ${pz(s[2])}\n- ${st[i+1][1]} ${pz(st[i+1][2])}\n`;i+=2}
@@ -373,7 +446,7 @@ function toIcu(p){
 }
 async function sendWatch(ds){
   const p=planOn(ds);if(!p)return;
-  if(!confirm(`${evOn(ds)?'Atualizar':'Enviar'} "${p.titulo}" (${ds.split('-').reverse().join('/')}) no calendário do Intervals.icu?\n\nO Intervals repassa ao Garmin Connect, e o 935 recebe na próxima sincronização.`))return;
+  if(!confirm(`${evOn(ds)?'Atualizar':'Enviar'} "${p.titulo}" (${ds.split('-').reverse().join('/')}) no calendário do Intervals.icu?\n\nO Intervals repassa ao Garmin Connect, e o relógio recebe na próxima sincronização.`))return;
   try{
     const old=evOn(ds),body=JSON.stringify({category:'WORKOUT',type:'Run',start_date_local:ds+'T00:00:00',name:p.titulo,description:toIcu(p)});
     const ev=old?await api(`/athlete/${CFG.athlete}/events/${old.id}`,{method:'PUT',body}):await api(`/athlete/${CFG.athlete}/events`,{method:'POST',body});
@@ -414,7 +487,7 @@ function pmcSvg(S,days=90){
   return `<svg class="ch" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="height:120px"><line x1="0" x2="${w}" y1="${y(0)}" y2="${y(0)}" stroke="#252a31"/>${line('ctl','#4a9eff')}${line('atl','#e0442f')}${line('tsb','#c9a24a',1)}</svg>
   <div class="row meta" style="gap:14px;margin-top:4px"><span><span style="color:var(--blue)">━</span> Forma</span><span><span style="color:var(--red)">━</span> Fadiga</span><span><span style="color:var(--amber)">┅</span> Equilíbrio</span></div>`;
 }
-function stepsHtml(p){return `<div class="steps">${p.steps.map(s=>`<div><span>${esc(s[0])}</span><span>${s[3]?s[3]+'× ':''}${esc(s[1])}${s[2]?' @ '+fmtP(Math.min(...s[2]))+'–'+fmtP(Math.max(...s[2]))+'/km':' leve'}</span></div>`).join('')}</div>`}
+function stepsHtml(p){return `<div class="steps">${p.steps.map(s=>`<div><span>${esc(s[0])}</span><span>${s[3]?s[3]+'× ':''}${esc(s[1])}${s[2]?' @ '+fmtP(Math.min(...s[2]))+'–'+fmtP(Math.max(...s[2]))+'/km':/Caminh/.test(s[0])?'':' leve'}</span></div>`).join('')}</div>`}
 const tagSt={cumprido:'<span class="tag ok">CUMPRIDO</span>',parcial:'<span class="tag warn">PARCIAL</span>',perdido:'<span class="tag bad">PERDIDO</span>',enviado:'<span class="tag ok">NO RELÓGIO</span>',planejado:'<span class="tag">PLANEJADO</span>'};
 const tipoIc={qualidade:'QLD',rodagem:'ROD',longo:'LNG',prova:'ALVO'};
 const typeIc=a=>isRun(a)?'RUN':/Walk|Hike/.test(a.type)?'MCH':/Swim/.test(a.type)?'NAT':/Weight/.test(a.type)?'FOR':/Ride/.test(a.type)?'BIK':'OUT';
@@ -430,7 +503,7 @@ function rIni(){
   const w=r.w,vo2=[...D.well].reverse().find(x=>x.vo2);
   let h='';
   if(!LS.get('guia'))h+=`<div class="card cur"><div class="lbl" style="color:var(--blue)">COMO USAR</div><p class="empty" style="margin-top:4px">Toque no <b style="color:#fff">?</b> ao lado de cada título para ver o que o número significa. Os cartões de sono, VO2 e FC abrem um resumo com o histórico.</p><button class="b sm pri" style="margin-top:8px" onclick="LS.set('guia',1);render()">Entendi</button></div>`;
-  if(D.athlete&&!D.athlete.gAct)h+=`<div class="card alert"><div class="lbl bad">ALERTA // SINCRONIZAÇÃO</div><p class="empty" style="margin-top:4px">As corridas do Garmin não estão chegando ao Intervals.icu (último treino recebido: ${last?last.date.slice(0,10).split('-').reverse().join('/'):'nenhum'}). Veja MAIS → Dispositivos.</p></div>`;
+  if(D.athlete&&!D.athlete.gAct&&hasWatch())h+=`<div class="card alert"><div class="lbl bad">ALERTA // SINCRONIZAÇÃO</div><p class="empty" style="margin-top:4px">As corridas do Garmin não estão chegando ao Intervals.icu (último treino recebido: ${last?last.date.slice(0,10).split('-').reverse().join('/'):'nenhum'}). Veja MAIS → Dispositivos.</p></div>`;
   // último treino
   h+=`<div class="sec">ÚLTIMO TREINO<small>${last?DOW[parseD(last.date).getDay()]+' '+last.date.slice(8,10)+'/'+last.date.slice(5,7):''}</small></div>`;
   if(last){const pace=last.mov/last.dist*1000;
@@ -453,8 +526,10 @@ function rIni(){
   if(nx){const adj=adjust(nx,r),st=status(nx),d=parseD(nx.date);
     h+=`<div class="card cur"><div class="row" style="justify-content:space-between"><span class="lbl">${DOW[d.getDay()]} ${nx.date.slice(8)}/${nx.date.slice(5,7)} · ${tipoIc[nx.tipo]}</span>${tagSt[st]}</div><h2 style="margin-top:4px">${esc(nx.titulo)}</h2><div class="meta">${nx.km} km</div>${stepsHtml(nx)}
     ${adj?`<div class="coach"><b class="bad" style="color:#ff7a66">CLAUDE COACH // AJUSTE PROPOSTO</b>${esc(adj.why)}<div class="row" style="margin-top:8px"><button class="b sm pri" onclick="acceptAdj('${nx.date}')">Aceitar ajuste</button></div></div>`:''}
-    <button class="b pri full" style="margin-top:10px" onclick="sendWatch('${nx.date}')">${st==='enviado'?'Reenviar ao relógio':'▲ Enviar ao relógio'}</button></div>`}
-  else h+=`<div class="card"><p class="empty">Nenhuma atividade planejada.</p></div>`;
+    ${hasWatch()?`<button class="b pri full" style="margin-top:10px" onclick="sendWatch('${nx.date}')">${st==='enviado'?'Reenviar ao relógio':'▲ Enviar ao relógio'}</button>`:''}
+    <div class="grid g2" style="margin-top:8px">${nx.date<=ds?`<button class="b ${hasWatch()?'':'pri'}" onclick="markDone('${nx.date}')">✓ Marcar feito</button>`:`<button class="b" onclick="openDay('${nx.date}')">Ver o dia</button>`}<button class="b" onclick="openBuilder('${nx.date}')">Editar treino</button></div></div>`}
+  else if(!isIgor()&&PF)h+=`<div class="card cur"><h2>Plano concluído</h2><p class="empty" style="margin-top:4px">Os treinos deste ciclo acabaram. Responda o questionário de novo para montar o próximo com base no que você fez.</p><button class="b pri full" style="margin-top:10px" onclick="redoPlan()">Montar o próximo plano</button></div>`;
+  else h+=`<div class="card"><p class="empty">Nenhuma atividade planejada.</p><button class="b full" style="margin-top:8px" onclick="openBuilder()">+ Criar treino</button></div>`;
   h+=`<div class="meta" style="text-align:center;margin-top:14px">${D.at?'Sincronizado '+new Date(D.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'Nunca sincronizado'}</div>`;
   el.innerHTML=h;
 }
@@ -546,7 +621,7 @@ window.openVital=(k,per)=>{
 /* ================= CALENDÁRIO ================= */
 let calMode='sem',calRef=TODAY();
 function rCal(){
-  const ds0=ymd(TODAY());let h=`<div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="seg"><button class="${calMode==='sem'?'on':''}" onclick="calSet('sem')">SEMANAL</button><button class="${calMode==='mes'?'on':''}" onclick="calSet('mes')">MENSAL</button></div><button class="b sm" onclick="calGo(0)">HOJE</button></div>`;
+  const ds0=ymd(TODAY());let h=`<div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="seg"><button class="${calMode==='sem'?'on':''}" onclick="calSet('sem')">SEMANAL</button><button class="${calMode==='mes'?'on':''}" onclick="calSet('mes')">MENSAL</button></div><div class="row"><button class="b sm" onclick="calGo(0)">HOJE</button><button class="b sm pri" onclick="openBuilder()" aria-label="Criar treino">+ TREINO</button></div></div>`;
   if(calMode==='sem'){
     const m=monday(calRef),e=addD(m,6);let tk=0,pk=0;
     h+=`<div class="wk"><button class="b sm" onclick="calGo(-1)">◀</button><b>${m.getDate()} ${MES[m.getMonth()]} — ${e.getDate()} ${MES[e.getMonth()]}</b><button class="b sm" onclick="calGo(1)">▶</button></div>`;
@@ -572,9 +647,12 @@ window.calGo=n=>{if(!n)calRef=TODAY();else if(calMode==='sem')calRef=addD(calRef
 window.openDay=ds=>{
   const p=planOn(ds),ex=actsOn(ds),w=W(ds)||{},d=parseD(ds);
   let h=`<div class="hd"><b>${DOW[d.getDay()]} ${ds.split('-').reverse().join('/')}</b><button class="b sm" onclick="closeSheet()">✕</button></div>`;
-  if(p)h+=`<div class="card cur"><div class="row" style="justify-content:space-between"><span class="lbl">PLANEJADO · ${tipoIc[p.tipo]}</span>${tagSt[status(p)]}</div><h2 style="margin-top:4px">${esc(p.titulo)}</h2><div class="meta">${p.km} km</div>${stepsHtml(p)}${p.why?`<div class="coach"><b>AJUSTE DO COACH</b>${esc(p.why)}</div>`:''}${ds>=ymd(TODAY())?`<button class="b pri full" style="margin-top:10px" onclick="sendWatch('${ds}')">▲ Enviar ao relógio</button>`:''}</div>`;
-  ex.forEach(a=>h+=`<div class="card" onclick="openAct('${a.id}')"><div class="lbl">EXECUTADO · ${typeIc(a)}</div><h2 style="margin-top:4px">${esc(a.name)}</h2><div class="meta">${a.dist?km(a.dist)+' km · ':''}${fmtT(a.mov)}${isRun(a)&&a.dist?' · '+fmtP(a.mov/a.dist*1000)+'/km':''}${a.hr?' · '+a.hr+' bpm':''}</div></div>`);
+  if(p)h+=`<div class="card cur"><div class="row" style="justify-content:space-between"><span class="lbl">PLANEJADO · ${tipoIc[p.tipo]}</span>${tagSt[status(p)]}</div><h2 style="margin-top:4px">${esc(p.titulo)}</h2><div class="meta">${p.km} km</div>${stepsHtml(p)}${p.why?`<div class="coach"><b>AJUSTE DO COACH</b>${esc(p.why)}</div>`:''}${ds>=ymd(TODAY())&&hasWatch()?`<button class="b pri full" style="margin-top:10px" onclick="sendWatch('${ds}')">▲ Enviar ao relógio</button>`:''}
+    <div class="grid g2" style="margin-top:8px">${ds<=ymd(TODAY())&&status(p)!=='cumprido'?`<button class="b" onclick="markDone('${ds}')">✓ Marcar feito</button>`:''}${ds>=ymd(TODAY())?`<button class="b" onclick="openBuilder('${ds}')">Editar treino</button>`:''}</div></div>`;
+  ex.forEach(a=>h+=`<div class="card" onclick="openAct('${a.id}')"><div class="row" style="justify-content:space-between"><span class="lbl">EXECUTADO · ${typeIc(a)}</span>${a.src==='MANUAL'?'<span class="tag">MARCADO À MÃO</span>':''}</div><h2 style="margin-top:4px">${esc(a.name)}</h2><div class="meta">${a.dist?km(a.dist)+' km · ':''}${fmtT(a.mov)}${isRun(a)&&a.dist?' · '+fmtP(a.mov/a.dist*1000)+'/km':''}${a.hr?' · '+a.hr+' bpm':''}</div>${isMan(a)?`<button class="b sm" style="margin-top:8px" onclick="event.stopPropagation();undoMan('${a.id}')">Desfazer</button>`:''}</div>`);
   if(!p&&!ex.length)h+=`<p class="empty">Dia de descanso.</p>`;
+  if(!p&&ds>=ymd(TODAY()))h+=`<button class="b full" style="margin:8px 0" onclick="openBuilder('${ds}')">+ Criar treino neste dia</button>`;
+  if(!p&&!ex.some(isRun)&&ds<=ymd(TODAY()))h+=`<button class="b full" style="margin:8px 0" onclick="markDone('${ds}')">✓ Registrar corrida feita</button>`;
   h+=`<div class="grid g3" style="margin-top:6px"><div class="cell"><div class="lbl">Sono</div><span class="num">${fmtSleep(w.sleep)}</span></div><div class="cell"><div class="lbl">FC rep.</div><span class="num">${w.rhr||'--'}</span></div><div class="cell"><div class="lbl">Passos</div><span class="num">${w.steps?(w.steps/1000).toFixed(1)+'k':'--'}</span></div></div>`;
   openSheet(h);
 };
@@ -586,6 +664,12 @@ const METAS=[
   {nome:'MEIA MARATONA',dist:21097.5,ini:'2026-11-01',fim:'2026-12-31',txt:'Completar 21,1 km até o fim de dezembro.'},
   {nome:'30 KM',dist:30000,ini:'2026-11-01',fim:'2027-03-31',txt:'Passar o recorde de 26 km e fechar os 30 km.'},
 ];
+function metas(){
+  if(isIgor())return METAS;
+  const M=PF&&META[PF.meta];if(!M||!M.d)return [];
+  const P=baseTemplate(),fim=P.length?P[P.length-1].date:PF.inicio;
+  return [{nome:M.n.toUpperCase(),dist:M.dist,ini:PF.inicio,fim,txt:`Completar ${M.n.toLowerCase()==='meia maratona'?'a meia maratona (21,1 km)':M.n} até ${fim.split('-').reverse().join('/')}.`}];
+}
 function bestIn(a,dist){
   let b=(AX[a.id]&&AX[a.id].best||{})[dist]||null;
   if(a.dist>=dist*0.99&&a.dist<=dist*1.05&&a.mov){const tt=Math.round(a.mov*dist/a.dist);if(!b||tt<b)b=tt}
@@ -601,7 +685,8 @@ function rDes(){
   const t=TODAY(),m=monday(t),runs=D.acts.filter(isRun);
   const sum=(a,b)=>runs.filter(x=>x.date.slice(0,10)>=a&&x.date.slice(0,10)<=b).reduce((s,x)=>s+(x.dist||0),0)/1000;
   const wk=sum(ymd(m),ymd(addD(m,6))),wkPlan=plan().filter(p=>p.date>=ymd(m)&&p.date<=ymd(addD(m,6))).reduce((s,p)=>s+p.km,0)||15;
-  const mo=sum(ymd(new Date(t.getFullYear(),t.getMonth(),1)),ymd(t)),moAlvo=t.getMonth()===10?75:60;
+  const m1=ymd(new Date(t.getFullYear(),t.getMonth(),1)),m2=ymd(new Date(t.getFullYear(),t.getMonth()+1,0));
+  const mo=sum(m1,ymd(t)),moAlvo=isIgor()?(t.getMonth()===10?75:60):Math.round(plan().filter(p=>p.date>=m1&&p.date<=m2).reduce((s,p)=>s+p.km,0))||Math.round(wkPlan*4);
   let seq=0;for(let i=0;i<52;i++){const a=addD(m,-7*i),n=runs.filter(x=>x.date.slice(0,10)>=ymd(a)&&x.date.slice(0,10)<=ymd(addD(a,6))).length;if(n>=2)seq++;else if(i>0)break}
   const ch=[
     ['VOLUME DA SEMANA',`${wk.toFixed(1)} / ${wkPlan} km`,wk/wkPlan],
@@ -611,7 +696,9 @@ function rDes(){
   let h=`<div class="sec">PROGRESSO</div>`;
   h+=ch.map(c=>{const v=clamp(c[2],0,1);return `<div class="card ${v>=1?'cur':''}"><div class="row" style="justify-content:space-between"><span class="lbl" style="color:var(--txt)">${c[0]}</span><span class="num ${v>=1?'ok':''}" style="font-size:12px">${Math.round(v*100)}%</span></div><div class="meta" style="margin-top:3px">${c[1]}</div><div class="bar"><i style="width:${v*100}%"></i></div></div>`}).join('');
   h+=`<div class="sec">METAS<small>COM PRAZO</small></div>`;
-  h+=METAS.map(mt=>{const s=metaStatus(mt);
+  const MT=metas();
+  if(!MT.length)h+=`<div class="card"><p class="empty">Sua meta é criar constância: correr nos dias combinados, semana após semana. Acompanhe no progresso acima.</p></div>`;
+  h+=MT.map(mt=>{const s=metaStatus(mt);
     return `<div class="card ${s.ok?'cur':s.fora?'alert':''}"><div class="row" style="justify-content:space-between"><span class="lbl" style="color:var(--txt)">${mt.nome}</span>${s.ok?'<span class="tag ok">✓ CUMPRIDA</span>':s.fora?'<span class="tag bad">PRAZO ENCERRADO</span>':'<span class="tag">PENDENTE</span>'}</div>
     <div class="meta" style="margin-top:4px;color:var(--txt)">${mt.txt}</div>
     <div class="row meta" style="justify-content:space-between;margin-top:8px"><span>Prazo: ${mt.fim.split('-').reverse().join('/')}</span><span>${s.ok?'Feita em '+fmtD(s.best.a.date)+(mt.tempo?' · '+fmtT(s.best.t):''):s.fora?'':s.antes?'Começa em '+fmtD(mt.ini):'Faltam '+s.dias+' dias'}</span></div>
@@ -621,15 +708,19 @@ function rDes(){
 
 /* ================= MAIS ================= */
 function rMais(){
-  const a=D.athlete||{},run=a.run||{},V=curVdot(),Z=V&&paceZones(V.v),S=pmc(),cur=S[S.length-1];
+  const a=D.athlete||{},run=a.run||{},V=curVdot()||(!isIgor()&&PF?{v:PF.V,est:1}:null),Z=V&&paceZones(V.v),S=pmc(),cur=S[S.length-1];
   const lastRun=D.acts.find(isRun),ramp=Math.round((cur.ctl-S[S.length-8].ctl)*10)/10||0;
   const wellOn=D.well.some(w=>w.d>=ymd(addD(TODAY(),-3))&&(w.rhr||w.sleep));
   const flag=(on,t)=>`<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid #15181d"><span style="font-size:12px">${t}</span><span class="tag ${on?'ok':'bad'}">${on?'LIGADO':'DESLIGADO'}</span></div>`;
-  let h=`<div class="sec">DISPOSITIVOS</div><div class="card ${a.gAct===false?'alert':'cur'}"><div class="row" style="justify-content:space-between"><h2>Garmin Forerunner 935</h2><span class="tag ${a.gAct?'ok':'bad'}">${a.gAct?'CONECTADO':'ATENÇÃO'}</span></div><div class="meta">Via Intervals.icu · última corrida recebida ${lastRun?lastRun.date.slice(0,10).split('-').reverse().join('/'):'--'}</div>
+  let h=!hasWatch()?devApp(lastRun):`<div class="sec">DISPOSITIVOS</div><div class="card ${a.gAct===false?'alert':'cur'}"><div class="row" style="justify-content:space-between"><h2>${isIgor()?'Garmin Forerunner 935':'Garmin'}</h2><span class="tag ${a.gAct?'ok':'bad'}">${a.gAct?'CONECTADO':'ATENÇÃO'}</span></div><div class="meta">Via Intervals.icu · última corrida recebida ${lastRun?lastRun.date.slice(0,10).split('-').reverse().join('/'):'--'}</div>
   <div style="margin-top:8px">${flag(a.gAct,'Receber atividades do Garmin')}${flag(wellOn,'Receber sono / FC repouso')}${flag(a.gUp,'Enviar treinos ao Garmin')}</div>
   ${a.gAct===false||!a.gUp?`<p class="empty" style="margin-top:8px">Para ligar: intervals.icu → Configurações → Conexões → Garmin → marque <b>Baixar atividades</b>, <b>Baixar dados de bem-estar</b> e <b>Carregar treinos planejados</b>.</p>`:''}
   <div class="row" style="margin-top:10px"><button class="b sm pri" onclick="sync(1)">Sincronizar tudo</button></div></div>`;
-  h+=`<div class="sec">MÉTRICAS AVANÇADAS</div><div class="card"><div class="grid g2"><div class="cell"><div class="lbl" style="display:flex;align-items:center;justify-content:space-between">VDOT ${qb('vdot')}</div><span class="num">${V?V.v.toFixed(1):'--'}</span><div class="meta">${V?'base: '+(V.dist/1000)+' km em '+fmtT(V.t):'sem esforço de 1,5 km ou mais'}</div></div><div class="cell"><div class="lbl" style="display:flex;align-items:center;justify-content:space-between">Rampa 7 dias ${qb('rampa')}</div><span class="num ${ramp>8?'bad':ramp>5?'warn':''}">${(ramp>0?'+':'')+ramp.toFixed(1)}</span><div class="meta">seguro: até +5 por semana</div></div></div>
+  if(!isIgor()&&PF){const M=META[PF.meta]||META.c,P=baseTemplate(),Z=zonesFor(PF.V),ld=PF.dias.includes(PF.longo)?PF.longo:PF.dias[0];
+    h+=`<div class="sec">MEU PLANO</div><div class="card"><div class="grid g2"><div class="cell"><div class="lbl">Meta</div><span class="num" style="font-size:14px">${M.n}</span></div><div class="cell"><div class="lbl">Duração</div><span class="num" style="font-size:14px">${P.length?fmtD(P[0].date)+' a '+fmtD(P[P.length-1].date):'--'}</span></div><div class="cell"><div class="lbl">Dias</div><span class="num" style="font-size:14px">${ORD.filter(d=>PF.dias.includes(d)).map(d=>DOW[d]).join(' ')}</span></div><div class="cell"><div class="lbl">Longão</div><span class="num" style="font-size:14px">${DNOME[ld]}</span></div></div>
+    <p class="empty" style="margin-top:8px">Ritmo leve: ${fmtP(Z.E[0])}–${fmtP(Z.E[1])}/km. O volume sobe no máximo 8% por semana e, a cada 4 semanas, uma semana mais leve para o corpo assimilar.</p>
+    <button class="b full" style="margin-top:10px" onclick="redoPlan()">Refazer o questionário</button></div>`}
+  h+=`<div class="sec">MÉTRICAS AVANÇADAS</div><div class="card"><div class="grid g2"><div class="cell"><div class="lbl" style="display:flex;align-items:center;justify-content:space-between">VDOT ${qb('vdot')}</div><span class="num">${V?V.v.toFixed(1):'--'}</span><div class="meta">${V?(V.est?'estimado pelo questionário':'base: '+(V.dist/1000)+' km em '+fmtT(V.t)):'sem esforço de 1,5 km ou mais'}</div></div><div class="cell"><div class="lbl" style="display:flex;align-items:center;justify-content:space-between">Rampa 7 dias ${qb('rampa')}</div><span class="num ${ramp>8?'bad':ramp>5?'warn':''}">${(ramp>0?'+':'')+ramp.toFixed(1)}</span><div class="meta">seguro: até +5 por semana</div></div></div>
   ${V?`<div class="lbl" style="margin-top:12px">Projeção de prova (condicionamento atual)</div><table style="margin-top:4px"><tr><th>Prova</th><th class="r">Tempo</th><th class="r">Ritmo</th></tr>${[[5000,'5 km'],[10000,'10 km'],[21097.5,'21 km'],[42195,'42 km']].map(([d,n])=>{const s=predict(V.v,d);return `<tr><td>${n}</td><td class="r">${fmtT(s)}</td><td class="r">${fmtP(s/d*1000)}</td></tr>`}).join('')}</table>
   <div class="lbl" style="margin-top:12px">Ritmos de treino (Daniels)</div><table style="margin-top:4px">${[['E','Leve / rodagem'],['M','Maratona'],['T','Limiar'],['I','Intervalado'],['R','Repetição']].map(([k,n])=>`<tr><td>${k}</td><td style="font-family:var(--f)">${n}</td><td class="r">${fmtP(Z[k][0])}–${fmtP(Z[k][1])}</td></tr>`).join('')}</table>`:''}
   <div class="lbl" style="margin-top:12px">Forma × fadiga · 180 dias</div>${pmcSvg(S,180)}</div>`;
@@ -669,7 +760,7 @@ const BADGES=[
 ];
 const hex=on=>`<svg class="hx" viewBox="0 0 44 44"><polygon points="22,2 40,12 40,32 22,42 4,32 4,12" fill="${on?'#0a1828':'#0a0a0a'}" stroke="${on?'#4a9eff':'#252a31'}" stroke-width="1.5"/><polygon points="22,10 33,16 33,28 22,34 11,28 11,16" fill="none" stroke="${on?'#c9a24a':'#252a31'}" stroke-width="1"/></svg>`;
 const badgeHtml=b=>`<div class="badge ${b.on?'':'lock'}">${hex(b.on)}<b>${b[1]}</b><small>${b[2]}</small></div>`;
-function badgeList(){const runs=D.acts.filter(isRun),L=Math.max(0,...runs.map(r=>r.dist||0))/1000;return BADGES.map(b=>Object.assign([...b],{on:!!b[3](runs,L)}))}
+function badgeList(){const runs=D.acts.filter(isRun),L=Math.max(0,...runs.map(r=>r.dist||0))/1000;return BADGES.map(b=>{const x=[...b];if(x[1]==='30K'&&!isIgor())x[2]='Correr 30 km';return Object.assign(x,{on:!!b[3](runs,L)})})}
 window.openBadges=()=>{const B=badgeList();let h=`<div class="hd"><b>CONQUISTAS · ${B.filter(b=>b.on).length}/${B.length}</b><button class="b sm" onclick="closeSheet()">✕</button></div>`;
   for(const g of ['CORRIDA','RITMO','CONSTÂNCIA','TRILHA'])h+=`<div class="sec">${g}</div><div class="grid g3">${B.filter(b=>b[0]===g).map(badgeHtml).join('')}</div>`;
   openSheet(h)};
@@ -689,7 +780,7 @@ function rPerf(){
 /* ================= detalhe da atividade ================= */
 window.openAct=async id=>{
   const a=D.acts.find(x=>x.id===id);if(!a)return;
-  if(isRun(a)&&!AX[id]){openSheet('<p class="empty">Carregando parciais…</p>');try{const s=await api(`/activity/${id}/streams?types=time,distance,heartrate,velocity_smooth,altitude`);const g=k=>(s.find(x=>x.type===k)||{}).data||[];AX[id]=analyze(g('time'),g('distance'),g('heartrate'),g('altitude'));LS.set('ax4',AX)}catch(e){}}
+  if(isRun(a)&&!AX[id]&&!isMan(a)){openSheet('<p class="empty">Carregando parciais…</p>');try{const s=await api(`/activity/${id}/streams?types=time,distance,heartrate,velocity_smooth,altitude`);const g=k=>(s.find(x=>x.type===k)||{}).data||[];AX[id]=analyze(g('time'),g('distance'),g('heartrate'),g('altitude'));LS.set('ax4',AX)}catch(e){}}
   const x=AX[id]||{},pace=a.dist?a.mov/a.dist*1000:null;
   let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>
   <div class="grid g3" style="margin-top:10px"><div class="cell"><div class="lbl">Dist.</div><span class="num">${km(a.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(a.mov)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${fmtP(pace)}</span></div><div class="cell"><div class="lbl">FC méd</div><span class="num">${a.hr||'--'}</span></div><div class="cell"><div class="lbl">FC máx</div><span class="num">${a.hrmax||'--'}</span></div><div class="cell"><div class="lbl">Carga</div><span class="num">${Math.round(loadOf(a))}</span></div><div class="cell"><div class="lbl">Altimetria</div><span class="num">${a.elev!=null?Math.round(a.elev)+'<small> m</small>':'--'}</span></div><div class="cell"><div class="lbl">Cadência</div><span class="num">${a.cad?Math.round(a.cad*2):'--'}</span></div><div class="cell"><div class="lbl">Deriva FC</div><span class="num">${x.dec!=null?x.dec+'%':'--'}</span></div></div>`;
@@ -710,14 +801,172 @@ function openSheet(h){const b=$('#sbox'),on=$('#sheet').classList.contains('on')
 window.closeSheet=()=>$('#sheet').classList.remove('on');
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet()});
 
+/* ================= questionário de boas-vindas ================= */
+const DNOME=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+const ORD=[1,2,3,4,5,6,0];
+const KM0=[[0,'Ainda não corro','Começa no corre e caminha'],[7,'Até 10 km','Uma ou duas corridas curtas'],[15,'De 10 a 20 km',''],[27,'De 20 a 35 km',''],[40,'Mais de 35 km','']];
+const T5=[[0,'Não sei',''],[2700,'Mais de 40 min',''],[2250,'De 35 a 40 min',''],[1950,'De 30 a 35 min',''],[1650,'De 25 a 30 min',''],[1380,'Menos de 25 min','']];
+let OB={i:0,a:null};
+const needOB=()=>!isIgor()&&!PF;
+function histo(){
+  const t=TODAY(),r=D.acts.filter(isRun),since=n=>r.filter(a=>a.date.slice(0,10)>=ymd(addD(t,-n)));
+  const w4=since(28).reduce((s,a)=>s+(a.dist||0),0)/4000,L=Math.max(0,...since(56).map(a=>a.dist||0))/1000,V=curVdot();
+  return {n:r.length,w4,L,V:V&&V.v};
+}
+function obInit(){const H=histo();OB.a={relogio:null,meta:null,dias:[2,4,0],longo:0,km0:H.n?(H.w4<1?0:H.w4<10?7:H.w4<20?15:H.w4<35?27:40):null,t5:null,H}}
+const OBS=[{id:'conn',show:()=>!CFG.key},{id:'oi'},{id:'relogio'},{id:'meta'},{id:'dias'},{id:'longo'},{id:'km0'},{id:'t5',show:()=>!!OB.a&&!OB.a.H.V},{id:'fim'}];
+function obPF(){
+  const a=OB.a,H=a.H,km0=a.km0||0,L0=H.L>=1?H.L:{0:0,7:3,15:5,27:8,40:12}[km0];
+  const V=H.V||vdot(5000,a.t5||(km0?2100:2700));
+  return {relogio:a.relogio,meta:a.meta,dias:a.dias,longo:a.longo,km0,L0:r5(L0),V:Math.round(V*10)/10,inicio:ymd(addD(TODAY(),1))};
+}
+function rOB(){
+  const el=$('#ini');if(CFG.key&&!OB.a)obInit();
+  const st=OBS.filter(s=>!s.show||s.show());OB.i=clamp(OB.i,0,st.length-1);const s=st[OB.i],a=OB.a||{};
+  const q=v=>typeof v==='string'?`'${v}'`:v;
+  const o=(k,v,t,sub)=>`<button class="opt ${a[k]===v?'on':''}" onclick="obSet('${k}',${q(v)})"><span>${t}${sub?`<small>${sub}</small>`:''}</span></button>`;
+  let h=s.id==='conn'?'':`<div class="row" style="justify-content:space-between;margin-bottom:8px">${OB.i>(CFG.key?0:1)?`<button class="b sm" onclick="obGo(-1)">◀ Voltar</button>`:'<span></span>'}<span class="meta">${OB.i+1} de ${st.length}</span></div><div class="bar" style="margin-bottom:18px"><i style="width:${(OB.i+1)/st.length*100}%"></i></div>`;
+  if(s.id==='conn')h+=`<div style="text-align:center;margin:8px 0 14px"><img src="logo.png" alt="" style="height:90px;mix-blend-mode:screen"></div><div class="obh">Bem-vindo ao Boonie Run</div><p class="obp">Para começar, conecte a sua conta do Intervals.icu. É grátis e é onde ficam as suas corridas.</p>
+    <div class="card"><div class="lbl">Onde achar os dados</div><p class="empty" style="margin-top:4px">No site intervals.icu, abra <b style="color:#fff">Settings</b> e desça até <b style="color:#fff">Developer Settings</b>. Lá estão o <b style="color:#fff">Athlete ID</b> e a <b style="color:#fff">API Key</b> (se não tiver chave, toque para gerar).</p></div>
+    <label class="f">Athlete ID</label><input id="c-ath" value="${esc(CFG.athlete)}" autocomplete="off" autocapitalize="off" placeholder="Ex.: i123456"><label class="f">Chave de API (fica só neste celular)</label><input id="c-key" type="password" autocomplete="off">
+    <button class="b pri full" style="margin-top:14px" onclick="obConn()">Conectar</button>
+    <p class="empty" style="margin-top:12px">Não tem conta? Crie em intervals.icu com o seu e-mail. Se o seu relógio não conversa com o Intervals, tudo bem: você segue os treinos pelo app e marca cada um como feito.</p>`;
+  if(s.id==='oi'){const H=a.H,nm=((D.athlete||{}).name||'').split(' ')[0];
+    h+=`<div class="obh">Vamos montar o seu plano${nm?', '+esc(nm):''}</div><p class="obp">São poucas perguntas rápidas. Com as respostas e o seu histórico, o app monta os treinos semana a semana.</p>
+    ${H.n?`<div class="card"><div class="lbl">Seu histórico no Intervals</div><div class="grid g3" style="margin-top:6px"><div class="cell"><div class="lbl">Corridas</div><span class="num">${H.n}</span></div><div class="cell"><div class="lbl">Km/semana</div><span class="num">${H.w4.toFixed(1)}</span><div class="meta">últ. 4 sem.</div></div><div class="cell"><div class="lbl">Maior</div><span class="num">${H.L.toFixed(1)}<small> km</small></span><div class="meta">últ. 8 sem.</div></div></div></div>`:`<div class="card"><p class="empty">Ainda não há corridas no seu Intervals. Sem problema: o plano começa leve.</p></div>`}
+    <button class="b pri full" style="margin-top:6px" onclick="obGo(1)">Começar</button>`}
+  if(s.id==='relogio')h+=`<div class="obh">Qual relógio você usa?</div><p class="obp">Serve para saber se o app pode mandar o treino direto para o pulso.</p>${o('relogio','garmin','Garmin','Recebe os treinos no relógio')}${o('relogio','outro','Outra marca','Você segue o treino pela tela do app')}${o('relogio','nenhum','Não uso relógio','Corre com o celular ou outro app')}`;
+  if(s.id==='meta')h+=`<div class="obh">Qual é o seu objetivo?</div><p class="obp">O plano vai até a data da meta. Depois é só montar o próximo.</p>${o('meta','c','Criar constância','Correr com regularidade · 8 semanas')}${o('meta','5','Correr 5 km','8 semanas')}${o('meta','10','Correr 10 km','10 semanas')}${o('meta','21','Meia maratona (21 km)','16 semanas')}`;
+  if(s.id==='dias')h+=`<div class="obh">Em quais dias você pode correr?</div><p class="obp">Escolha pelo menos 2. Para quem está começando ou voltando, 3 dias é o ideal.</p><div class="chips">${ORD.map(d=>`<button class="${a.dias.includes(d)?'on':''}" onclick="obDia(${d})">${DOW[d]}</button>`).join('')}</div><p class="meta" style="margin-top:10px">${a.dias.length} ${a.dias.length===1?'dia':'dias'} por semana</p><button class="b pri full" style="margin-top:16px" ${a.dias.length<2?'disabled':''} onclick="obGo(1)">Continuar</button>`;
+  if(s.id==='longo')h+=`<div class="obh">Em qual dia fica o treino mais longo?</div><p class="obp">O longão pede mais tempo livre. Costuma ser no fim de semana.</p>${ORD.filter(d=>a.dias.includes(d)).map(d=>o('longo',d,DNOME[d])).join('')}`;
+  if(s.id==='km0')h+=`<div class="obh">Quanto você corre por semana hoje?</div><p class="obp">${a.H.n?`Pelo Intervals, a sua média das últimas 4 semanas é de ${a.H.w4.toFixed(1)} km. Já deixamos marcado, mas pode trocar.`:'Pode ser aproximado.'}</p>${KM0.map(([v,t,sub])=>o('km0',v,t,sub)).join('')}`;
+  if(s.id==='t5')h+=`<div class="obh">Quanto tempo você leva para correr 5 km?</div><p class="obp">Pode ser um chute. Serve para calcular o ritmo dos treinos, e ele se ajusta conforme você corre.</p>${T5.map(([v,t])=>o('t5',v,t)).join('')}`;
+  if(s.id==='fim'){const pf=obPF(),P=genPlan(pf),M=META[pf.meta],Z=zonesFor(pf.V),w1=P.filter(p=>p.date<ymd(addD(monday(parseD(P[0].date)),7)));
+    const lg=P.filter(p=>p.tipo==='longo'),wk={};P.forEach(p=>{const k=ymd(monday(parseD(p.date)));wk[k]=(wk[k]||0)+p.km});const pico=Math.max(...Object.values(wk));
+    h+=`<div class="obh">Seu plano está pronto</div><p class="obp">${M.n} · ${Object.keys(wk).length} semanas · de ${fmtD(P[0].date)} a ${fmtD(P[P.length-1].date)}</p>
+    <div class="grid g3"><div class="cell"><div class="lbl">Treinos</div><span class="num">${P.length}</span></div><div class="cell"><div class="lbl">Pico/sem.</div><span class="num">${Math.round(pico)}<small> km</small></span></div><div class="cell"><div class="lbl">Ritmo leve</div><span class="num" style="font-size:14px">${fmtP(Z.E[0])}–${fmtP(Z.E[1])}</span></div></div>
+    <div class="sec">PRIMEIRA SEMANA</div>${w1.map(p=>{const d=parseD(p.date);return `<div class="day"><div class="d"><span>${DOW[d.getDay()]}</span><b>${pad(d.getDate())}</b></div><div class="pl">${esc(p.titulo)}<div class="meta">${kmTxt(p.km)} km</div></div><span class="tag">${tipoIc[p.tipo]}</span></div>`}).join('')}
+    ${lg.length>1?`<p class="empty" style="margin-top:8px">O longão vai de ${kmTxt(lg[0].km)} km até ${kmTxt(Math.max(...lg.map(p=>p.km)))} km. A cada 4 semanas, uma semana mais leve para o corpo assimilar.</p>`:''}
+    <button class="b pri full" style="margin-top:14px" onclick="obDone()">Criar meu plano</button>`}
+  el.innerHTML=h;
+}
+window.obGo=n=>{OB.i+=n;$('#v-ini').scrollTop=0;rOB()};
+window.obSet=(k,v)=>{OB.a[k]=v;obGo(1)};
+window.obDia=d=>{const a=OB.a;a.dias=a.dias.includes(d)?a.dias.filter(x=>x!==d):a.dias.concat(d);if(!a.dias.includes(a.longo))a.longo=a.dias.includes(0)?0:a.dias.includes(6)?6:a.dias[a.dias.length-1];rOB()};
+window.obConn=async()=>{
+  const ath=$('#c-ath').value.trim(),key=$('#c-key').value.trim();if(!ath||!key)return toast('PREENCHA OS DOIS CAMPOS');
+  CFG.athlete=ath;CFG.key=key;
+  try{await api('/athlete/'+ath)}catch(e){CFG.key='';toast('NÃO CONECTOU // CONFIRA O ID E A CHAVE',3500);return}
+  saveCfg();OB={i:0,a:null};await sync(0);
+};
+window.obDone=()=>{PF=obPF();LS.set('pf',PF);OB={i:0,a:null};toast('PLANO CRIADO');go('ini')};
+window.redoPlan=()=>{if(!confirm('Refazer o questionário? O plano atual será substituído. Os treinos que você criou à mão continuam.'))return;PF=null;LS.set('pf',null);OB={i:0,a:null};closeSheet();go('ini')};
+function devApp(lastRun){
+  const nm={outro:'Outro relógio',nenhum:'Sem relógio'}[PF&&PF.relogio]||'Sem relógio';
+  return `<div class="sec">DISPOSITIVOS</div><div class="card cur"><div class="row" style="justify-content:space-between"><h2>${nm}</h2><span class="tag ok">PELO APP</span></div>
+  <p class="empty" style="margin-top:6px">Os treinos ficam aqui no app. Depois de correr, toque em <b style="color:#fff">Marcar feito</b> no Início ou no dia do Calendário e informe a distância e o tempo.</p>
+  <p class="empty" style="margin-top:6px">Se o seu relógio mandar as corridas para o Intervals.icu, elas aparecem sozinhas${lastRun?` (última recebida: ${fmtD(lastRun.date)})`:''}.</p>
+  <div class="row" style="margin-top:10px"><button class="b sm pri" onclick="sync(1)">Sincronizar tudo</button></div></div>`;
+}
+
+/* ================= marcar como feito ================= */
+const curV=()=>isIgor()?(curVdot()||{}).v:(PF&&PF.V)||(curVdot()||{}).v;
+window.markDone=ds=>{
+  const p=planOn(ds),E=zonesFor(curV()).E,mins=p?Math.round(p.km*(E[0]+E[1])/120):'';
+  openSheet(`<div class="hd"><b>MARCAR COMO FEITO</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <p class="empty">Correu com outro app ou sem relógio? Registre aqui. O treino passa a contar no calendário, na forma e nos desafios.</p>
+  <div class="card" style="margin-top:10px"><div class="lbl">${DOW[parseD(ds).getDay()]} ${fmtD(ds)}</div><h2 style="margin-top:2px">${esc(p?p.titulo:'Corrida')}</h2></div>
+  <div class="grid g2"><div><label class="f">Distância (km)</label><input id="m-km" type="text" inputmode="decimal" value="${p?kmTxt(p.km):''}"></div><div><label class="f">Tempo (minutos)</label><input id="m-min" type="text" inputmode="decimal" value="${mins}"></div></div>
+  <button class="b pri full" style="margin-top:14px" onclick="saveDone('${ds}')">✓ Salvar</button>`);
+};
+window.saveDone=async ds=>{
+  const n=id=>parseFloat(String($(id).value).replace(',','.')),k=n('#m-km'),mn=n('#m-min');
+  if(!(k>0&&mn>0))return toast('PREENCHA A DISTÂNCIA E O TEMPO');
+  const p=planOn(ds),a={date:ds+'T07:00:00',type:'Run',name:p?p.titulo:'Corrida',dist:Math.round(k*1000),mov:Math.round(mn*60),el:Math.round(mn*60),src:'MANUAL'};
+  try{ // grava no Intervals para valer em qualquer aparelho; sem conexão, fica só neste
+    const r=await api(`/athlete/${CFG.athlete}/activities/manual`,{method:'POST',body:JSON.stringify({start_date_local:a.date,type:'Run',name:a.name,distance:a.dist,moving_time:a.mov,elapsed_time:a.mov,description:'Marcado como feito no Boonie Run'})});
+    const x=slim(r||{});x.id=x.id||'icu-'+Date.now();x.date=x.date||a.date;x.type=x.type||'Run';x.dist=x.dist??a.dist;x.mov=x.mov??a.mov;x.src='MANUAL';
+    D.acts=withMan([x].concat(D.acts));toast('TREINO MARCADO // SALVO NO INTERVALS');
+  }catch(e){a.id='man-'+Date.now();MAN.push(a);LS.set('man',MAN);D.acts=withMan(D.acts);toast('TREINO MARCADO NESTE CELULAR')}
+  LS.set('data',D);closeSheet();render();
+};
+window.undoMan=id=>{if(!confirm('Desfazer este registro?'))return;MAN=MAN.filter(m=>m.id!==id);LS.set('man',MAN);D.acts=withMan(D.acts);LS.set('data',D);closeSheet();render()};
+
+/* ================= criar treino ================= */
+const ETAPAS=['Aquecer','Contínuo','Corre','Tiro','Ritmo','Limiar','Aceleração','Rec.','Caminhada','Desaquecer'];
+const ZN=[['E','Leve'],['M','Moderado'],['T','Limiar'],['I','Intervalado'],['R','Tiro curto']];
+const unitOf=s=>/km$/.test(s)?'km':/min$/.test(s)?'min':'m';
+function zoneOf(r,Z){if(!r)return '';let b='E',bd=1e9;for(const k in Z){const d=Math.abs((Z[k][0]+Z[k][1]-r[0]-r[1])/2);if(d<bd){bd=d;b=k}}return b}
+const stepKm=s=>{const v=parseFloat(s[1]),r=s[3]||1,u=unitOf(s[1]);if(u==='km')return v*r;if(u==='m')return v/1000*r;return v*60/(s[2]?(s[2][0]+s[2][1])/2:/Caminh/.test(s[0])?600:420)*r};
+const TPL={
+  rod:['Rodagem leve','rodagem',[['Contínuo',5,'km','E',1]]],
+  tir:['Tiros 6×400 m','qualidade',[['Aquecer',1.5,'km','E',1],['Tiro',400,'m','I',6],['Rec.',200,'m','',6],['Desaquecer',1.5,'km','E',1]]],
+  rit:['Ritmo 3×1 km','qualidade',[['Aquecer',1.5,'km','E',1],['Ritmo',1,'km','T',3],['Rec.',2,'min','',3],['Desaquecer',1.5,'km','E',1]]],
+  lon:['Longão','longo',[['Contínuo',8,'km','E',1]]],
+  cc:['Corre e caminha','rodagem',[['Corre',2,'min','E',8],['Caminhada',1,'min','',8]]],
+};
+const tplSteps=k=>TPL[k][2].map(([et,v,u,z,r])=>({et,v,u,z,r}));
+let BD=null;
+window.openBuilder=ds=>{
+  const Z=zonesFor(curV()),p=ds&&planOn(ds);
+  BD={date:ds||ymd(TODAY()),orig:p?ds:null,titulo:p?p.titulo:'',tipo:p?p.tipo:'rodagem',
+    steps:p?p.steps.map(s=>({et:s[0],v:parseFloat(s[1]),u:unitOf(s[1]),z:s[4]!=null?s[4]:zoneOf(s[2],Z),r:s[3]||1})):tplSteps('rod')};
+  drawB();
+};
+window.bTpl=k=>{BD.titulo=TPL[k][0];BD.tipo=TPL[k][1];BD.steps=tplSteps(k);drawB()};
+window.bSet=(i,k,v)=>{if(i<0)BD[k]=v;else BD.steps[i][k]=k==='v'||k==='r'?parseFloat(String(v).replace(',','.'))||0:v;const t=$('#b-tot');if(t)t.textContent=bTot()};
+window.bAdd=()=>{BD.steps.push({et:'Contínuo',v:1,u:'km',z:'E',r:1});drawB()};
+window.bDel=i=>{BD.steps.splice(i,1);drawB()};
+function bPlan(){
+  const Z=zonesFor(curV());
+  const steps=BD.steps.filter(s=>s.v>0).map(s=>{const a=[s.et,String(s.v)+s.u,s.z?Z[s.z]:null];if(s.r>1)a[3]=Math.round(s.r);a[4]=s.z;return a});
+  return {date:BD.date,tipo:BD.tipo,titulo:BD.titulo.trim()||'Treino livre',km:r5(steps.reduce((t,s)=>t+stepKm(s),0))||1,steps,custom:1};
+}
+const bTot=()=>'≈ '+kmTxt(bPlan().km)+' km';
+function drawB(){
+  const Z=zonesFor(curV()),ex=LS.get('extra',{}),o=BD.orig,orig=o&&baseTemplate().some(p=>p.date===o);
+  const opt=(arr,cur)=>arr.map(([v,l])=>`<option value="${v}" ${v===cur?'selected':''}>${l}</option>`).join('');
+  openSheet(`<div class="hd"><b>${o?'EDITAR TREINO':'NOVO TREINO'}</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <div class="lbl">Começar de um modelo</div><div class="row" style="margin-top:6px">${[['rod','Rodagem'],['tir','Tiros'],['rit','Ritmo'],['lon','Longão'],['cc','Corre e caminha']].map(([k,l])=>`<button class="b sm" onclick="bTpl('${k}')">${l}</button>`).join('')}</div>
+  <div class="grid g2"><div><label class="f">Dia</label><input type="date" value="${BD.date}" onchange="bSet(-1,'date',this.value)"></div><div><label class="f">Tipo</label><select onchange="bSet(-1,'tipo',this.value)">${opt([['rodagem','Rodagem'],['qualidade','Qualidade'],['longo','Longão'],['prova','Prova']],BD.tipo)}</select></div></div>
+  <label class="f">Nome</label><input value="${esc(BD.titulo)}" placeholder="Ex.: Tiros na pista" oninput="bSet(-1,'titulo',this.value)">
+  <div class="sec">ETAPAS<small id="b-tot">${bTot()}</small></div>
+  ${BD.steps.map((s,i)=>`<div class="stp"><div class="row" style="flex-wrap:nowrap"><select style="flex:1" onchange="bSet(${i},'et',this.value)">${opt(ETAPAS.map(e=>[e,e]),s.et)}</select><button class="b sm" onclick="bDel(${i})" aria-label="Remover etapa">✕</button></div>
+    <div class="grid g3" style="margin-top:2px"><div><label class="f">Vezes</label><input type="text" inputmode="numeric" value="${s.r}" oninput="bSet(${i},'r',this.value)"></div><div><label class="f">Quanto</label><input type="text" inputmode="decimal" value="${kmTxt(s.v)}" oninput="bSet(${i},'v',this.value)"></div><div><label class="f">Medida</label><select onchange="bSet(${i},'u',this.value)">${opt([['km','km'],['m','metros'],['min','minutos']],s.u)}</select></div></div>
+    <label class="f">Ritmo</label><select onchange="bSet(${i},'z',this.value)">${opt(ZN.map(([k,l])=>[k,`${l} · ${fmtP(Z[k][0])}–${fmtP(Z[k][1])}/km`]).concat([['','Livre / trote / caminhada']]),s.z)}</select></div>`).join('')}
+  <button class="b full" onclick="bAdd()">+ Adicionar etapa</button>
+  <button class="b pri full" style="margin-top:14px" onclick="bSave(0)">Salvar no calendário</button>
+  ${hasWatch()?`<button class="b pri full" style="margin-top:8px" onclick="bSave(1)">Salvar e enviar ao relógio</button>`:''}
+  ${o&&ex[o]&&orig?`<button class="b full" style="margin-top:8px" onclick="bOrig()">Voltar ao treino original</button>`:''}
+  ${o?`<button class="b red full" style="margin-top:8px" onclick="bOff()">Tirar o treino deste dia</button>`:''}
+  <p class="empty" style="margin-top:10px">Os ritmos vêm do seu nível atual (VDOT) e se ajustam sozinhos quando você evolui.</p>`);
+}
+function bClear(ex,ds){if(baseTemplate().some(p=>p.date===ds))ex[ds]={date:ds,off:1};else delete ex[ds]}
+window.bSave=send=>{
+  if(!BD.steps.some(s=>s.v>0))return toast('ADICIONE PELO MENOS UMA ETAPA');
+  if(!BD.date)return toast('ESCOLHA O DIA');
+  const p=bPlan(),ex=LS.get('extra',{}),ov=LS.get('ov',{});
+  if(BD.orig&&BD.orig!==p.date)bClear(ex,BD.orig);
+  ex[p.date]=p;delete ov[p.date];LS.set('extra',ex);LS.set('ov',ov);
+  closeSheet();toast('TREINO SALVO NO CALENDÁRIO');render();
+  if(send)sendWatch(p.date);
+};
+window.bOff=()=>{if(!confirm('Tirar o treino deste dia? Ele vira dia de descanso.'))return;const ex=LS.get('extra',{});bClear(ex,BD.orig);LS.set('extra',ex);closeSheet();toast('DIA LIVRE');render()};
+window.bOrig=()=>{const ex=LS.get('extra',{});delete ex[BD.orig];LS.set('extra',ex);closeSheet();toast('TREINO ORIGINAL DE VOLTA');render()};
+
 /* ================= navegação ================= */
 const TITLES={ini:'INÍCIO',cal:'CALENDÁRIO',des:'DESAFIOS',mais:'MAIS',perf:'PERFIL'};
 let VIEW='ini';
-function go(v){VIEW=v;document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$('#ttl').textContent=TITLES[v];render()}
+function go2(v){document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.v===v))}
+function go(v){VIEW=v;go2(v);render()}
 document.querySelectorAll('#tabbar button').forEach(b=>b.onclick=()=>go(b.dataset.v));
 $('#av').onclick=()=>go(VIEW==='perf'?'ini':'perf');
 $('#sync').onclick=()=>sync(0);
 function render(){
+  const ob=needOB();document.body.classList.toggle('ob',ob);
+  if(ob){document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-ini'));$('#ttl').textContent='BOAS-VINDAS';rOB();return}
+  if(VIEW==='ini'||!$('#v-'+VIEW).classList.contains('on'))go2(VIEW);
+  $('#ttl').textContent=TITLES[VIEW];
   const a=D.athlete;if(a&&a.pic)$('#avimg').src=a.pic;
   $('#avst').className=D.at&&Date.now()-D.at<864e5?'on':D.at?'off':'';
   ({ini:rIni,cal:rCal,des:rDes,mais:rMais,perf:rPerf})[VIEW]();
