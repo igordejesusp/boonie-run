@@ -129,6 +129,7 @@ svg.ch{width:100%;display:block}
 .feel{display:flex;gap:6px}
 .feel button{flex:1;min-height:44px;background:#070707;border:1px solid var(--line);border-radius:6px;font-family:var(--m);color:var(--dim)}
 .feel button.on{border-color:var(--blue);color:var(--blue);background:#0a1828}
+.map{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#0b0b0b}.map svg{display:block;width:100%;height:auto}.map span{position:absolute;right:6px;bottom:3px;font-size:8px;color:#5c636d;letter-spacing:.02em}
 .spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
 body.ob #tabbar,body.ob #sync,body.ob #av{display:none}
 body.ob .view{bottom:0}
@@ -213,7 +214,7 @@ let MAN=LS.get('man',[]);
 const isMan=a=>String(a.id).startsWith('man-');
 const withMan=acts=>acts.filter(a=>!isMan(a)).concat(MAN).sort((a,b)=>a.date<b.date?1:-1);
 D.acts=withMan(D.acts||[]);
-let AX=LS.get('ax4',{}); // análise por atividade: splits, best efforts, deriva
+let AX=LS.get('ax5',{}); // análise por atividade: splits, best efforts, deriva, trajeto
 const slim=a=>({id:a.id,date:a.start_date_local,type:a.type,name:a.name,dist:a.distance,mov:a.moving_time,el:a.elapsed_time,hr:a.average_heartrate,hrmax:a.max_heartrate,load:a.icu_training_load,trimp:a.trimp,elev:a.total_elevation_gain,cad:a.average_cadence,rpe:a.icu_rpe,feel:a.feel,speed:a.average_speed,src:a.source});
 
 async function sync(full){
@@ -240,15 +241,16 @@ const BE=[[1000,'1 KM'],[3000,'3 KM'],[5000,'5 KM'],[10000,'10 KM'],[21097.5,'21
 async function analyzeRuns(full){
   const runs=D.acts.filter(isRun).filter(a=>!isMan(a)&&(full||!AX[a.id])).slice(0,60);
   for(const a of runs){
-    try{
-      const s=await api(`/activity/${a.id}/streams?types=time,distance,heartrate,velocity_smooth,altitude`);
-      const g=k=>(s.find(x=>x.type===k)||{}).data||[];
-      AX[a.id]=analyze(g('time'),g('distance'),g('heartrate'),g('altitude'));
-    }catch(e){AX[a.id]={err:1}}
+    try{await loadAX(a.id)}catch(e){AX[a.id]={err:1}}
   }
-  LS.set('ax4',AX);
+  LS.set('ax5',AX);
 }
-function analyze(t,d,hr,alt){
+async function loadAX(id){
+  const s=await api(`/activity/${id}/streams?types=time,distance,heartrate,velocity_smooth,altitude,latlng`);
+  const f=k=>s.find(x=>x.type===k)||{},g=k=>f(k).data||[];
+  AX[id]=analyze(g('time'),g('distance'),g('heartrate'),g('altitude'),f('latlng'));
+}
+function analyze(t,d,hr,alt,ll){
   const out={splits:[],best:{},dec:null,chart:null};
   if(!t.length||!d.length)return out;
   // saltos de GPS: trecho acima de 6,5 m/s (2:34/km) não conta distância
@@ -292,6 +294,13 @@ function analyze(t,d,hr,alt){
   const n=Math.max(1,Math.floor(t.length/120));const P=[],H=[];
   for(let i=n;i<t.length;i+=n){const dd=d[i]-d[i-n],tt=t[i]-t[i-n];P.push(dd>0?tt/dd*1000:null);H.push(hr[i]||null)}
   out.chart={p:P,h:H};
+  // trajeto reduzido (até ~300 pontos); o Intervals manda a latitude em data e a longitude em data2
+  if(ll&&ll.data&&ll.data2){const la=ll.data,lo=ll.data2,st=Math.max(1,Math.ceil(la.length/300)),tr=[];
+    const ix=[];for(let i=0;i<la.length;i+=st)ix.push(i);if(ix[ix.length-1]!==la.length-1)ix.push(la.length-1);
+    for(const i of ix){if(la[i]==null||lo[i]==null||(!la[i]&&!lo[i]))continue;const q=tr[tr.length-1];
+      if(q&&Math.abs(la[i]-q[0])+Math.abs(lo[i]-q[1])>0.005)continue; // salto de GPS
+      tr.push([+la[i].toFixed(5),+lo[i].toFixed(5)])}
+    if(tr.length>1)out.map=tr}
   return out;
 }
 
@@ -479,6 +488,21 @@ function coachLast(a){
 }
 
 /* ================= componentes ================= */
+// mapa estático: ladrilhos cinza-escuro do Esri (sem chave) em projeção de Mercator, escurecidos até o preto, com o trajeto em azul por cima
+function mapSvg(tr,H){
+  const W=360,P=(la,lo,z)=>{const s=256*2**z,r=Math.sin(la*Math.PI/180);return [(lo+180)/360*s,(0.5-Math.log((1+r)/(1-r))/(4*Math.PI))*s]};
+  const la=tr.map(p=>p[0]),lo=tr.map(p=>p[1]),N=Math.max(...la),S=Math.min(...la),E=Math.max(...lo),O=Math.min(...lo);
+  // maior zoom em que o trajeto cabe; depois amplia os ladrilhos (até 2×) para ele ocupar o quadro
+  let z=16,a,b;for(;z>3;z--){a=P(N,O,z);b=P(S,E,z);if(b[0]-a[0]<=W*0.82&&b[1]-a[1]<=H*0.78)break}
+  const k=clamp(Math.min(W*0.82/((b[0]-a[0])||1),H*0.78/((b[1]-a[1])||1)),1,2),T=256*k;
+  const ox=(a[0]+b[0])/2*k-W/2,oy=(a[1]+b[1])/2*k-H/2;
+  let t='';for(let x=Math.floor(ox/T);x<=Math.floor((ox+W)/T);x++)for(let y=Math.floor(oy/T);y<=Math.floor((oy+H)/T);y++)
+    t+=`<image href="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}" x="${(x*T-ox).toFixed(1)}" y="${(y*T-oy).toFixed(1)}" width="${(T+.6).toFixed(1)}" height="${(T+.6).toFixed(1)}"/>`;
+  const pts=tr.map(p=>{const q=P(p[0],p[1],z);return [(q[0]*k-ox).toFixed(1),(q[1]*k-oy).toFixed(1)]}),pl=pts.map(p=>p.join(',')).join(' '),s0=pts[0],s1=pts[pts.length-1];
+  return `<div class="map"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice"><filter id="mpf" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="linear" slope="1.6" intercept="-.4"/><feFuncG type="linear" slope="1.6" intercept="-.4"/><feFuncB type="linear" slope="1.6" intercept="-.4"/></feComponentTransfer></filter><rect width="${W}" height="${H}" fill="#050505"/><g filter="url(#mpf)">${t}</g>
+  <polyline points="${pl}" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/><polyline points="${pl}" fill="none" stroke="#4a9eff" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="${s0[0]}" cy="${s0[1]}" r="5" fill="#fff" stroke="#4a9eff" stroke-width="2.5"/><circle cx="${s1[0]}" cy="${s1[1]}" r="5" fill="#4a9eff" stroke="#fff" stroke-width="2"/></svg><span>© Esri · OpenStreetMap</span></div>`;
+}
 function ringSvg(v,cls){const c=2*Math.PI*36,col=cls==='ok'?'var(--blue)':cls==='warn'?'var(--amber)':'var(--red)';return `<svg viewBox="0 0 86 86"><circle cx="43" cy="43" r="36" stroke="#161a21" stroke-width="7" fill="none"/><circle cx="43" cy="43" r="36" stroke="${col}" stroke-width="7" fill="none" stroke-dasharray="${c*v/100} ${c}" transform="rotate(-90 43 43)"/><text x="43" y="49" text-anchor="middle" fill="#fff" font-family="ui-monospace,Menlo,monospace" font-size="20" font-weight="700">${v}</text></svg>`}
 function pmcSvg(S,days=90){
   S=S.slice(-days);const w=600,h=120,mx=Math.max(10,...S.map(s=>Math.max(s.ctl,s.atl))),mn=Math.min(-10,...S.map(s=>s.tsb));
@@ -507,7 +531,7 @@ function rIni(){
   // último treino
   h+=`<div class="sec">ÚLTIMO TREINO<small>${last?DOW[parseD(last.date).getDay()]+' '+last.date.slice(8,10)+'/'+last.date.slice(5,7):''}</small></div>`;
   if(last){const pace=last.mov/last.dist*1000;
-    h+=`<div class="card cur" onclick="openAct('${last.id}')"><h2>${esc(last.name)}</h2><div class="meta">${last.date.slice(11,16)} · ${fmtT(last.mov)} em movimento</div>
+    h+=`<div class="card cur" onclick="openAct('${last.id}')"><h2>${esc(last.name)}</h2><div class="meta">${last.date.slice(11,16)} · ${fmtT(last.mov)} em movimento</div>${(AX[last.id]||{}).map?mapSvg(AX[last.id].map,180):''}
     <div class="grid g4" style="margin-top:10px"><div class="cell"><div class="lbl">Dist.</div><span class="num">${km(last.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${fmtP(pace)}<small>/km</small></span></div><div class="cell"><div class="lbl">FC méd/máx</div><span class="num">${last.hr||'--'}<small>/${last.hrmax||'--'}</small></span></div><div class="cell"><div class="lbl">Esforço</div><span class="num">${last.rpe?last.rpe+'<small>/10</small>':Math.round(loadOf(last))+'<small> carga</small>'}</span></div></div>
     <div class="coach"><b>CLAUDE COACH // LEITURA</b>${esc(coachLast(last))}</div></div>`}
   else h+=`<div class="card"><p class="empty">Nenhuma corrida registrada ainda.</p></div>`;
@@ -780,9 +804,9 @@ function rPerf(){
 /* ================= detalhe da atividade ================= */
 window.openAct=async id=>{
   const a=D.acts.find(x=>x.id===id);if(!a)return;
-  if(isRun(a)&&!AX[id]&&!isMan(a)){openSheet('<p class="empty">Carregando parciais…</p>');try{const s=await api(`/activity/${id}/streams?types=time,distance,heartrate,velocity_smooth,altitude`);const g=k=>(s.find(x=>x.type===k)||{}).data||[];AX[id]=analyze(g('time'),g('distance'),g('heartrate'),g('altitude'));LS.set('ax4',AX)}catch(e){}}
+  if(a.dist&&!AX[id]&&!isMan(a)){openSheet('<p class="empty">Carregando parciais…</p>');try{await loadAX(id);LS.set('ax5',AX)}catch(e){}}
   const x=AX[id]||{},pace=a.dist?a.mov/a.dist*1000:null;
-  let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>
+  let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>${x.map?mapSvg(x.map,230):''}
   <div class="grid g3" style="margin-top:10px"><div class="cell"><div class="lbl">Dist.</div><span class="num">${km(a.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(a.mov)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${fmtP(pace)}</span></div><div class="cell"><div class="lbl">FC méd</div><span class="num">${a.hr||'--'}</span></div><div class="cell"><div class="lbl">FC máx</div><span class="num">${a.hrmax||'--'}</span></div><div class="cell"><div class="lbl">Carga</div><span class="num">${Math.round(loadOf(a))}</span></div><div class="cell"><div class="lbl">Altimetria</div><span class="num">${a.elev!=null?Math.round(a.elev)+'<small> m</small>':'--'}</span></div><div class="cell"><div class="lbl">Cadência</div><span class="num">${a.cad?Math.round(a.cad*2):'--'}</span></div><div class="cell"><div class="lbl">Deriva FC</div><span class="num">${x.dec!=null?x.dec+'%':'--'}</span></div></div>`;
   if(x.chart&&x.chart.p.length>3){const P=x.chart.p.map(v=>v&&v<600?v:null),H=x.chart.h,pv=P.filter(Boolean),hv=H.filter(Boolean);const pmn=Math.min(...pv),pmx=Math.max(...pv),hmn=Math.min(...hv),hmx=Math.max(...hv),w=600,hh=110,X=i=>i/(P.length-1)*w;
     const pl=(arr,mn,mx,inv,c)=>`<polyline fill="none" stroke="${c}" stroke-width="1.5" points="${arr.map((v,i)=>v==null?'':X(i).toFixed(1)+','+(inv?8+(v-mn)/((mx-mn)||1)*(hh-16):hh-8-(v-mn)/((mx-mn)||1)*(hh-16)).toFixed(1)).filter(Boolean).join(' ')}"/>`;
