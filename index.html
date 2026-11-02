@@ -156,7 +156,41 @@ svg.ch{width:100%;display:block}
 .chip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:18px;background:rgba(5,5,5,.86);border:1px solid var(--line);color:var(--txt);font-size:10px;letter-spacing:.1em;white-space:nowrap}.chip.b{color:var(--blue);border-color:var(--blue);min-width:0}
 .fab{position:absolute;z-index:3;right:12px;bottom:40px;width:50px;height:50px;border-radius:50%;background:rgba(5,5,5,.9);border:1px solid var(--blue);color:var(--blue);font-size:22px;line-height:1;padding:0}
 .maplibregl-ctrl-attrib{background:rgba(0,0,0,.6)!important;color:#5c636d!important;font-size:9px}.maplibregl-ctrl-attrib a{color:#5c636d!important}.maplibregl-ctrl-attrib-button{filter:invert(1) opacity(.5)}
-.spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+.spin{animation:sp 1s linear infinite}
+/* blocos: cada título de seção e o que vem depois dele; no celular empilham, em tela larga viram colunas */
+.blk>.sec:first-child{margin-top:20px}.blk:first-child>.sec:first-child{margin-top:4px}
+/* ================= telas largas: computador, iPad e tablet ================= */
+@media (min-width:760px){
+  .view{padding:18px 24px 34px}
+  .wrap{max-width:1200px}
+  body:not(.ob) #ini,#mais,#perf{columns:2;column-gap:20px}
+  #des{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;align-items:start}
+  .blk{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;display:inline-block;width:100%;margin-bottom:16px;vertical-align:top}
+  .blk>.sec:first-child{margin-top:4px}
+  #v-ini{padding-bottom:100px}
+  body.ob .wrap{max-width:540px}
+  #ini .map{height:250px!important}
+  .map .mimg{object-fit:cover}
+  /* calendário: semana lado a lado, mês com células mais largas */
+  .week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+  .week .day{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-height:200px;margin:0;padding:10px}
+  .week .day .d{display:flex;align-items:baseline;gap:6px;text-align:left}
+  .week .day .vt{margin-top:auto;text-align:left}
+  .mc{aspect-ratio:1.5/1;padding:8px;font-size:12px}.mc .k{font-size:14px}
+  .mgrid{gap:6px}
+  /* painéis viram janelas no centro */
+  #sheet .box{inset:0;margin:auto;width:min(620px,92vw);height:fit-content;max-height:88%;border:1px solid var(--blue);border-radius:14px;padding:22px 20px 24px}
+  #sheet .box:before{display:none}
+  /* gravação: mapa grande à esquerda, números à direita */
+  #rec.on{display:grid;grid-template-columns:minmax(0,1fr) 420px;grid-template-rows:auto 1fr auto}
+  #rec .rtop{grid-column:1/3}
+  #rmap{grid-column:1;grid-row:2/4;min-height:0}
+  #rec .rmet{grid-column:2;grid-row:2;padding:24px 20px 0;align-self:center}
+  #rec .rctl{grid-column:2;grid-row:3}
+  .rbig{font-size:72px}
+}
+@media (min-width:1500px){#mais,#perf{columns:3}}
+@keyframes sp{to{transform:rotate(360deg)}}
 body.ob #tabbar,body.ob #sync,body.ob #av{display:none}
 body.ob .view{bottom:0}
 .obh{font-size:22px;color:#fff;line-height:1.25;margin:4px 0 6px}
@@ -709,12 +743,14 @@ function rCal(){
   if(calMode==='sem'){
     const m=monday(calRef),e=addD(m,6);let tk=0,pk=0;
     h+=`<div class="wk"><button class="b sm" onclick="calGo(-1)">◀</button><b>${m.getDate()} ${MES[m.getMonth()]} — ${e.getDate()} ${MES[e.getMonth()]}</b><button class="b sm" onclick="calGo(1)">▶</button></div>`;
+    h+='<div class="week">';
     for(let i=0;i<7;i++){const d=addD(m,i),ds=ymd(d),p=planOn(ds),ex=actsOn(ds),w=W(ds)||{};
       const rk=ex.filter(isRun).reduce((s,a)=>s+(a.dist||0),0);tk+=rk;pk+=p?p.km*1000:0;
       h+=`<div class="day ${ds===ds0?'today':''}" onclick="openDay('${ds}')"><div class="d"><span>${DOW[d.getDay()]}</span><b>${pad(d.getDate())}</b></div><div style="min-width:0">
       ${p?`<div class="pl"><span class="tag ${status(p)==='cumprido'?'ok':status(p)==='perdido'?'bad':''}">${tipoIc[p.tipo]}</span> ${esc(p.titulo)} <span class="dim">· ${p.km} km</span></div>`:`<div class="pl dim">${ex.length?'':'Descanso'}</div>`}
       ${ex.map(a=>`<div class="ex">✓ ${typeIc(a)} ${a.dist?km(a.dist)+' km':fmtT(a.mov)}${isRun(a)&&a.dist?' · '+fmtP(a.mov/a.dist*1000)+'/km':''}${a.hr?' · '+a.hr+' bpm':''}</div>`).join('')}</div>
       <div class="vt">${w.sleep?'☾ '+fmtSleep(w.sleep):''}<br>${w.rhr?'♥ '+w.rhr:''}</div></div>`}
+    h+='</div>';
     h+=`<div class="card" style="margin-top:8px"><div class="row" style="justify-content:space-between"><span class="lbl">Volume da semana</span><span class="num">${pk?km(tk)+' / '+km(pk):km(tk)} km</span></div>${pk?`<div class="bar"><i style="width:${clamp(tk/pk*100,0,100)}%"></i></div>`:'<div class="meta" style="margin-top:4px">Sem treinos planejados nesta semana.</div>'}</div>`;
   }else{
     const y=calRef.getFullYear(),mo=calRef.getMonth(),f=monday(new Date(y,mo,1));
@@ -849,7 +885,7 @@ window.openBadges=()=>{const B=badgeList();let h=`<div class="hd"><b>CONQUISTAS 
   for(const g of ['CORRIDA','RITMO','CONSTÂNCIA','TRILHA'])h+=`<div class="sec">${g}</div><div class="grid g3">${B.filter(b=>b[0]===g).map(badgeHtml).join('')}</div>`;
   openSheet(h)};
 let LIM=8;
-window.verMais=()=>{LIM+=8;rPerf()};
+window.verMais=()=>{LIM+=8;render()};
 function rPerf(){
   const a=D.athlete||{},runs=D.acts.filter(isRun),B=bests(0),yr=String(TODAY().getFullYear());
   const tot=runs.filter(x=>x.date.slice(0,4)===yr).reduce((s,x)=>s+(x.dist||0),0);
@@ -1130,7 +1166,7 @@ window.locateMe=fly=>{
   navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];
     if(CM&&CM.getSource('eu'))CM.getSource('eu').setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}]});
     if(fly&&CM)CM.flyTo({center:c,zoom:14.5})},
-    ()=>fly&&toast('PERMITA A LOCALIZAÇÃO NOS AJUSTES DO IPHONE',3500),{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+    ()=>fly&&toast(locMsg(),3500),{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
 };
 const medal=i=>['🥇','🥈','🥉'][i]||(i+1)+'º';
 const avatar=(u,s=30)=>`<img src="${esc(u.pic)}" alt="" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:1px solid ${u.me?'var(--blue)':'var(--line)'};flex:none">`;
@@ -1190,6 +1226,7 @@ const recLive=()=>!!REC&&REC.st!=='idle';
 const recMov=()=>REC?(REC.mov+(REC.st==='run'?Date.now()-REC.since:0))/1000:0;
 const recKeep=()=>LS.set('rec',REC);
 const isoLocal=ms=>{const d=new Date(ms);return ymd(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())};
+const locMsg=()=>/iPhone|iPad/.test(navigator.userAgent)?'PERMITA A LOCALIZAÇÃO NOS AJUSTES DO IPHONE':'PERMITA A LOCALIZAÇÃO NO NAVEGADOR';
 const say=t=>{if(!LS.get('voz',1)||!window.speechSynthesis)return;try{const u=new SpeechSynthesisUtterance(t);u.lang='pt-BR';u.rate=1.05;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}};
 const paceVoz=s=>{s=Math.round(s);return Math.floor(s/60)+' e '+(s%60)};
 async function wake(on){try{if(on&&!WL&&navigator.wakeLock){WL=await navigator.wakeLock.request('screen');WL.addEventListener('release',()=>{WL=null})}else if(!on&&WL){await WL.release();WL=null}}catch(e){}}
@@ -1208,7 +1245,7 @@ function onPos(p){
   recDraw();recUI();
 }
 function recWatch(on){
-  if(on&&RWID==null&&navigator.geolocation)RWID=navigator.geolocation.watchPosition(onPos,e=>{FIX=null;recUI();if(e.code===1)toast('PERMITA A LOCALIZAÇÃO NOS AJUSTES DO IPHONE',4000)},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  if(on&&RWID==null&&navigator.geolocation)RWID=navigator.geolocation.watchPosition(onPos,e=>{FIX=null;recUI();if(e.code===1)toast(locMsg(),4000)},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
   if(!on&&RWID!=null){navigator.geolocation.clearWatch(RWID);RWID=null}
 }
 // ritmo atual: últimos 30 s do trecho em andamento
@@ -1316,6 +1353,9 @@ function go(v){VIEW=v;go2(v);render()}
 document.querySelectorAll('#tabbar button').forEach(b=>b.onclick=()=>go(b.dataset.v));
 $('#av').onclick=()=>go(VIEW==='perf'?'ini':'perf');
 $('#sync').onclick=()=>sync(0);
+// junta cada título de seção (.sec) com o conteúdo dele num bloco, para as colunas não cortarem uma seção ao meio
+function groupBlocks(el){const K=[...el.children];if(!K.length||K[0].classList.contains('blk'))return;let b=null;
+  for(const k of K){if(!b||k.classList.contains('sec')){b=document.createElement('div');b.className='blk';el.insertBefore(b,k)}b.appendChild(k)}}
 function render(){
   const ob=needOB();document.body.classList.toggle('ob',ob);
   const fab=$('#recfab');fab.classList.toggle('on',!ob&&!!CFG.key&&(VIEW==='ini'||recLive())&&!$('#rec').classList.contains('on'));fab.classList.toggle('live',recLive());
@@ -1325,6 +1365,7 @@ function render(){
   $('#avimg').src=myPic();
   $('#avst').className=D.at&&Date.now()-D.at<864e5?'on':D.at?'off':'';
   ({ini:rIni,cal:rCal,des:rDes,comp:rComp,mais:rMais,perf:rPerf})[VIEW]();
+  if(['ini','des','mais','perf'].includes(VIEW))groupBlocks($('#'+VIEW));
   drawMaps();
 }
 window.sync=sync;window.sendWatch=sendWatch;
