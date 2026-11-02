@@ -297,6 +297,7 @@ async function sync(full){
       at:Date.now()};
     LS.set('data',D);
     await analyzeRuns(full);
+    publishMine().catch(()=>{}); // corrida nova entra no ranking público (só para quem aceitou)
     toast('SINCRONIZADO // '+D.acts.length+' ATIVIDADES');
   }catch(e){toast(e.message==='SEM CHAVE'?'CONFIGURE A CHAVE EM MAIS':'FALHA NA SINCRONIZAÇÃO // '+e.message,3500)}
   btn.disabled=false;btn.textContent='SYNC';render();
@@ -1078,8 +1079,8 @@ window.bOrig=()=>{const ex=LS.get('extra',{});delete ex[BD.orig];LS.set('extra',
 
 /* ================= COMPETITIVO ================= */
 // locais = agrupamento das corridas (de todos os atletas) pelo centro do trajeto; cada local tem ranking por distância
-// amigos: o Intervals deixa a sua chave ler quem te segue ou te aceita como treinador (o ID aparece em athlete-summary)
-let FR=LS.get('fr',{}),CM=null,CP={i:0,d:0},PLC=[];
+// os outros atletas vêm do servidor público (PUBURL); ninguém precisa adicionar ninguém
+let CM=null,CP={i:0,d:0},PLC=[];
 const CDIST=[[1000,'1 KM'],[3000,'3 KM'],[5000,'5 KM'],[10000,'10 KM'],[21097.5,'21 KM']];
 const myPic=()=>LS.get('foto',null)||(D.athlete||{}).pic||'logo.png';
 const dM=(p,q)=>Math.hypot((p[0]-q[0])*111320,(p[1]-q[1])*111320*Math.cos(p[0]*Math.PI/180));
@@ -1088,7 +1089,7 @@ function bestsOf(a,b0){const b={...(b0||{})};for(const [d] of CDIST)if(a.dist>=d
 function people(){
   const me={id:CFG.athlete,name:((D.athlete||{}).name||'Você'),pic:myPic(),me:1,
     runs:D.acts.filter(a=>isRun(a)&&AX[a.id]&&AX[a.id].map).map(a=>({id:a.id,date:a.date,dist:a.dist,mov:a.mov,best:bestsOf(a,AX[a.id].best),map:AX[a.id].map}))};
-  return [me,...Object.entries(FR).filter(([id,f])=>id!==CFG.athlete&&f.runs&&f.runs.length).map(([id,f])=>({id,name:f.name||id,pic:f.pic||'logo.png',runs:f.runs}))];
+  return [me,...PUBL.filter(u=>u.id!==CFG.athlete&&u.runs&&u.runs.length).map(u=>({id:u.id,name:u.name||u.id,pic:u.pic||'logo.png',runs:u.runs}))];
 }
 function buildPlaces(P){
   const L=[];
@@ -1113,22 +1114,28 @@ function placeName(pl){
       PN[pl.key]=a.park||a.leisure||a.neighbourhood||a.suburb||a.road||a.city_district||('Local '+(pl.i+1));LS.set('pn',PN)}catch(e){return 'Local '+(pl.i+1)}
     await new Promise(r=>setTimeout(r,1100));return PN[pl.key]});
 }
-async function syncFriends(){
-  const ids=new Set(LS.get('amigos',[]));
-  try{(await api('/athlete/0/athlete-summary.json')||[]).forEach(x=>x.athlete_id&&x.athlete_id!==CFG.athlete&&ids.add(x.athlete_id))}catch(e){}
-  for(const id of ids){
-    const f=FR[id]=FR[id]||{runs:[]};
-    try{
-      const [ath,acts]=await Promise.all([api('/athlete/'+id),api(`/athlete/${id}/activities?oldest=${ymd(addD(TODAY(),-365))}&newest=${ymd(addD(TODAY(),1))}`)]);
-      Object.assign(f,{name:ath.name,pic:ath.profile_medium,sex:ath.sex,err:0,at:Date.now()});
-      const have=new Set(f.runs.map(r=>r.id));
-      for(const a of (acts||[]).filter(a=>isRun(a)&&a.distance&&!have.has(a.id)).slice(0,60)){
-        try{const s=await api(`/activity/${a.id}/streams?types=time,distance,latlng`),g=k=>(s.find(x=>x.type===k)||{}),x=analyze(g('time').data||[],g('distance').data||[],[],[],g('latlng'));
-          if(x.map)f.runs.push({id:a.id,date:a.start_date_local,dist:a.distance,mov:a.moving_time,best:bestsOf({dist:a.distance,mov:a.moving_time},x.best),map:x.map.filter((_,i)=>i%2===0||i===x.map.length-1)})}catch(e){}
-      }
-    }catch(e){f.err=e.message==='HTTP 403'||e.message==='HTTP 401'?'SEM ACESSO':e.message}
-  }
-  LS.set('fr',FR);
+// servidor público do Competitivo: cada app publica o resumo das próprias corridas e lê o de todos
+const PUBURL='https://boonie-run.igordejesusp.workers.dev';
+let PUBL=LS.get('pub',[]);
+// tira 200 m do começo e do fim (para não mostrar onde a pessoa mora) e reduz a até 80 pontos
+function trimTrack(tr){
+  if(!tr||tr.length<6)return null;let a=0,d=0;while(a<tr.length-1&&d<200){d+=dM(tr[a],tr[a+1]);a++}
+  let b=tr.length-1;d=0;while(b>a&&d<200){d+=dM(tr[b],tr[b-1]);b--}
+  const t=tr.slice(a,b+1);if(t.length<3)return null;const st=Math.max(1,Math.ceil(t.length/80));
+  return t.filter((_,i)=>i%st===0||i===t.length-1);
+}
+async function publishMine(force){
+  if(LS.get('comp',null)!=='sim'||!CFG.key)return;
+  const runs=D.acts.filter(a=>isRun(a)&&AX[a.id]&&AX[a.id].map).slice(0,150).map(a=>({id:a.id,date:a.date.slice(0,10),dist:Math.round(a.dist||0),mov:a.mov,best:bestsOf(a,AX[a.id].best),map:trimTrack(AX[a.id].map)})).filter(r=>r.map);
+  const sig=runs.length+'|'+(runs[0]&&runs[0].id)+'|'+runs.reduce((s,r)=>s+r.dist,0);
+  if(!force&&sig===LS.get('pubh',''))return;
+  const r=await fetch(PUBURL+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({athlete:CFG.athlete,key:CFG.key,runs})});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  LS.set('pubh',sig);
+}
+async function pullAll(){
+  const r=await fetch(PUBURL+'/all');if(!r.ok)throw new Error('HTTP '+r.status);
+  PUBL=(await r.json()).filter(u=>u.id!==CFG.athlete);LS.set('pub',PUBL);LS.set('pubAt',Date.now());
 }
 function compData(){
   const P=people();PLC=buildPlaces(P);
@@ -1138,7 +1145,7 @@ function compData(){
 }
 function rComp(){
   const el=$('#comp');
-  if(!$('#cmap'))el.innerHTML=`<div id="cmap"></div><div class="cbar"><span class="chip" id="c-info">CARREGANDO…</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="chip b" onclick="openRank()">RANKING</button><button class="chip b" onclick="openFriends()">AMIGOS</button></span></div><button class="fab" onclick="locateMe(1)" aria-label="Onde estou">◎</button>`;
+  if(!$('#cmap'))el.innerHTML=`<div id="cmap"></div><div class="cbar"><span class="chip" id="c-info">CARREGANDO…</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="chip b" onclick="openRank()">RANKING</button><button class="chip b" id="c-me" onclick="openCompCfg()">EU</button></span></div><button class="fab" onclick="locateMe(1)" aria-label="Onde estou">◎</button>`;
   const {P,lines,pts}=compData();
   $('#c-info').textContent=`${PLC.length} ${PLC.length===1?'LOCAL':'LOCAIS'} · ${P.length} ${P.length===1?'ATLETA':'ATLETAS'}`;
   mlLoad().then(st=>{
@@ -1159,7 +1166,9 @@ function rComp(){
       locateMe(0);
     });
   }).catch(()=>{$('#c-info').textContent='MAPA INDISPONÍVEL SEM INTERNET'});
-  if(!LS.get('frAt',0)||Date.now()-LS.get('frAt',0)>3600e3){LS.set('frAt',Date.now());syncFriends().then(()=>VIEW==='comp'&&rComp())}
+  $('#c-me').textContent=LS.get('comp',null)==='sim'?'NO RANKING':'SÓ OLHANDO';
+  if(LS.get('comp',null)==null&&!$('#sheet').classList.contains('on'))openCompCfg(1);
+  if(Date.now()-LS.get('pubAt',0)>120e3){LS.set('pubAt',Date.now());Promise.all([publishMine().catch(()=>{}),pullAll()]).then(()=>VIEW==='comp'&&rComp()).catch(()=>{})}
 }
 window.locateMe=fly=>{
   if(!navigator.geolocation)return fly&&toast('GPS INDISPONÍVEL');
@@ -1190,20 +1199,26 @@ window.openRank=()=>{
   const R=ranking();
   let h=`<div class="hd"><b>RANKING GERAL</b><button class="b sm" onclick="closeSheet()">✕</button></div><p class="empty">Em cada local e distância, o 1º lugar vale 10 pontos, o 2º vale 6, o 3º vale 3 e os demais 1. 👑 é quantas vezes a pessoa é a mais rápida.</p>
   <div class="card" style="padding:4px 12px;margin-top:10px">${R.map((x,j)=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:10px 0;border-bottom:1px solid #15181d"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u,34)}<span style="flex:1;min-width:0"><b style="display:block;font-size:14px;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">👑 ${x.coroas} · ${x.locais.size} ${x.locais.size===1?'local':'locais'}</span></span><span class="num" style="font-size:18px">${x.pts}<small class="dim"> pts</small></span></div>`).join('')||'<p class="empty" style="padding:10px 0">Sem corridas com GPS ainda.</p>'}</div>
-  ${R.length<2?`<p class="empty">Por enquanto só você aparece. Toque em AMIGOS para ligar o André e os outros.</p>`:''}`;
+  ${R.length<2?`<p class="empty">Por enquanto só você aparece. Quando outras pessoas usarem o app e entrarem no ranking, elas aparecem aqui sozinhas.</p>`:''}`;
   openSheet(h);
 };
-window.openFriends=()=>{
-  const ids=[...new Set([...LS.get('amigos',[]),...Object.keys(FR)])].filter(id=>id!==CFG.athlete);
-  openSheet(`<div class="hd"><b>AMIGOS</b><button class="b sm" onclick="closeSheet()">✕</button></div>
-  <p class="empty">Para as marcas de um amigo aparecerem aqui, ele precisa liberar a conta dele para você no Intervals.icu: no site, ele te adiciona como seguidor ou treinador, e você aceita. Faça o mesmo por ele, para ele ver as suas.</p>
-  <div class="card" style="margin-top:10px;padding:4px 12px">${ids.map(id=>{const f=FR[id]||{};return `<div class="row" style="flex-wrap:nowrap;gap:10px;padding:9px 0;border-bottom:1px solid #15181d">${avatar({pic:f.pic||'logo.png'},30)}<span style="flex:1;min-width:0"><b style="display:block;font-size:13px">${esc(f.name||id)}</b><span class="meta">${esc(id)} · ${f.err?'<span class="bad">'+esc(f.err)+'</span>':f.runs?f.runs.length+' corridas com GPS':'ainda não lido'}</span></span><button class="b sm" onclick="delFriend('${esc(id)}')" aria-label="Remover">✕</button></div>`}).join('')||'<p class="empty" style="padding:10px 0">Nenhum amigo ainda.</p>'}</div>
-  <label class="f">Athlete ID do amigo</label><input id="f-id" placeholder="Ex.: i123456" autocomplete="off" autocapitalize="off">
-  <div class="grid g2" style="margin-top:10px"><button class="b pri" onclick="addFriend()">Adicionar</button><button class="b" onclick="refreshFriends()">Atualizar marcas</button></div>`);
+window.openCompCfg=first=>{
+  const on=LS.get('comp',null)==='sim';
+  openSheet(`<div class="hd"><b>${first?'BEM-VINDO AO COMPETITIVO':'SEU PERFIL NO COMPETITIVO'}</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <p class="empty" style="color:var(--txt)">Aqui aparecem as marcas de todo mundo que usa o Boonie Run, em cada local onde vocês correm. Ninguém precisa adicionar ninguém.</p>
+  <p class="empty" style="margin-top:8px">Para entrar no ranking, o app publica o resumo das suas corridas: data, distância, tempos e o trajeto sem os primeiros e os últimos 200 m, para não mostrar onde você mora. A sua chave do Intervals só é usada para provar que as corridas são suas e não fica guardada.</p>
+  ${first?'':`<div class="card ${on?'cur':''}" style="margin-top:10px"><div class="row" style="justify-content:space-between"><span class="lbl" style="color:var(--txt)">Situação</span><span class="tag ${on?'ok':''}">${on?'NO RANKING':'SÓ OLHANDO'}</span></div></div>`}
+  <div class="grid g2" style="margin-top:12px">${on?`<button class="b red" onclick="compSet('nao')">Sair do ranking</button><button class="b" onclick="compSet('sim',1)">Atualizar marcas</button>`:`<button class="b pri" onclick="compSet('sim')">Entrar no ranking</button><button class="b" onclick="compSet('nao')">Só olhar</button>`}</div>`);
 };
-window.addFriend=async()=>{let id=$('#f-id').value.trim();if(!id)return;if(/^\d+$/.test(id))id='i'+id;const L=LS.get('amigos',[]);if(!L.includes(id))L.push(id);LS.set('amigos',L);toast('LENDO AS CORRIDAS…');await syncFriends();openFriends();rComp()};
-window.delFriend=id=>{if(!confirm('Tirar este amigo do Competitivo?'))return;LS.set('amigos',LS.get('amigos',[]).filter(x=>x!==id));delete FR[id];LS.set('fr',FR);openFriends();rComp()};
-window.refreshFriends=async()=>{toast('ATUALIZANDO…');await syncFriends();LS.set('frAt',Date.now());openFriends();rComp();toast('MARCAS ATUALIZADAS')};
+window.compSet=async(v,upd)=>{
+  const era=LS.get('comp',null);LS.set('comp',v);closeSheet();
+  try{
+    if(v==='sim'){toast('PUBLICANDO SUAS MARCAS…');await publishMine(1);toast(upd?'MARCAS ATUALIZADAS':'VOCÊ ESTÁ NO RANKING')}
+    else if(era==='sim'){await fetch(PUBURL+'/me',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({athlete:CFG.athlete,key:CFG.key})});LS.set('pubh','');toast('VOCÊ SAIU DO RANKING')}
+    await pullAll();
+  }catch(e){toast('SEM CONEXÃO COM O SERVIDOR // '+e.message,3500)}
+  rComp();
+};
 
 /* ================= foto de perfil ================= */
 window.pickFoto=()=>{

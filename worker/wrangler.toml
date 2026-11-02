@@ -1,0 +1,8 @@
+name = "boonie-run"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+account_id = "f4758d1c66cbf131cd9fe0867ee809be"
+
+[[kv_namespaces]]
+binding = "BR"
+id = "998528dd70064dcfa957ecbb78d3e76b"
