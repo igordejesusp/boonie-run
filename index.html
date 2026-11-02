@@ -9,10 +9,21 @@
 <title>Boonie Run</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script>
+// no iPhone aberto pela Tela de Início (barra de status transparente) a página recebe a altura da tela menos a barra de status,
+// e sobra uma faixa preta embaixo; aqui o app ocupa a altura real da tela, em qualquer modelo e orientação
+(function(){
+  const fit=()=>{let h=innerHeight;
+    if(navigator.standalone){const deitado=innerWidth>innerHeight,s=deitado?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height);h=Math.max(h,s)}
+    document.documentElement.style.setProperty('--app-h',h+'px')};
+  fit();addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,300));
+})();
+</script>
 <style>
 :root{--bg:#000;--panel:#0d0d0d;--line:#252a31;--blue:#4a9eff;--amber:#c9a24a;--red:#e0442f;--ok:#7cc4ff;--cy:#f2f4ee;--txt:#f2f4ee;--dim:#8a929e;--f:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","Segoe UI",Roboto,Inter,Arial,sans-serif;--m:ui-monospace,"SF Mono",Menlo,monospace}
 *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--bg);color:var(--txt);font-family:var(--f);font-variant-numeric:tabular-nums;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:manipulation;-webkit-text-size-adjust:100%}
+html,body{height:100%;height:var(--app-h,100%);background:var(--bg);color:var(--txt);font-family:var(--f);font-variant-numeric:tabular-nums;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:manipulation;-webkit-text-size-adjust:100%}
+body{position:relative;overflow:hidden} /* as camadas absolutas (abas, telas, painéis) seguem a altura corrigida do corpo */
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 #top{position:absolute;top:0;left:0;right:0;z-index:9;background:linear-gradient(var(--panel),#080808);border-bottom:1px solid var(--line);padding:calc(8px + env(safe-area-inset-top)) 12px 8px;display:flex;align-items:center;gap:10px}
