@@ -28,7 +28,7 @@ button{cursor:pointer}
 .view.on{display:block}
 .wrap{max-width:480px;margin:0 auto}
 #tabbar{position:absolute;left:0;right:0;bottom:0;z-index:9;height:calc(60px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:#000;border-top:1px solid var(--line);display:flex}
-#tabbar button{flex:1;min-width:0;background:none;border:0;color:var(--dim);font-size:9.5px;letter-spacing:.08em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+#tabbar button{flex:1;min-width:0;background:none;border:0;color:var(--dim);font-size:8.5px;letter-spacing:.03em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
 #tabbar svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6}
 #tabbar button.on{color:var(--blue);box-shadow:inset 0 2px var(--blue)}
 .sec{margin:20px 0 8px;padding-bottom:6px;color:var(--amber);letter-spacing:.14em;font-size:11px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;min-height:34px}
@@ -130,6 +130,11 @@ svg.ch{width:100%;display:block}
 .feel button{flex:1;min-height:44px;background:#070707;border:1px solid var(--line);border-radius:6px;font-family:var(--m);color:var(--dim)}
 .feel button.on{border-color:var(--blue);color:var(--blue);background:#0a1828}
 .map{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#000}.map .mimg{position:absolute;inset:0;width:100%;height:100%;display:block}.map span{position:absolute;right:6px;bottom:3px;z-index:2;font-size:8px;color:#5c636d;letter-spacing:.02em}
+#v-comp{padding:0;overflow:hidden}#comp{max-width:none;height:100%;position:relative}#cmap{position:absolute;inset:0;background:#000}
+.cbar{position:absolute;z-index:3;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:6px;pointer-events:none}.cbar>*{pointer-events:auto}
+.chip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:18px;background:rgba(5,5,5,.86);border:1px solid var(--line);color:var(--txt);font-size:10px;letter-spacing:.1em;white-space:nowrap}.chip.b{color:var(--blue);border-color:var(--blue);min-width:0}
+.fab{position:absolute;z-index:3;right:12px;bottom:40px;width:50px;height:50px;border-radius:50%;background:rgba(5,5,5,.9);border:1px solid var(--blue);color:var(--blue);font-size:22px;line-height:1;padding:0}
+.maplibregl-ctrl-attrib{background:rgba(0,0,0,.6)!important;color:#5c636d!important;font-size:9px}.maplibregl-ctrl-attrib a{color:#5c636d!important}.maplibregl-ctrl-attrib-button{filter:invert(1) opacity(.5)}
 .spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
 body.ob #tabbar,body.ob #sync,body.ob #av{display:none}
 body.ob .view{bottom:0}
@@ -159,6 +164,7 @@ select{min-height:44px}
   <section class="view on" id="v-ini"><div class="wrap" id="ini"></div></section>
   <section class="view" id="v-cal"><div class="wrap" id="cal"></div></section>
   <section class="view" id="v-des"><div class="wrap" id="des"></div></section>
+  <section class="view" id="v-comp"><div class="wrap" id="comp"></div></section>
   <section class="view" id="v-mais"><div class="wrap" id="mais"></div></section>
   <section class="view" id="v-perf"><div class="wrap" id="perf"></div></section>
 </main>
@@ -167,6 +173,7 @@ select{min-height:44px}
   <button data-v="ini" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></svg>INÍCIO</button>
   <button data-v="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>CALENDÁRIO</button>
   <button data-v="des"><svg viewBox="0 0 24 24"><path d="M6 3v18M6 4h11l-2 4 2 4H6"/></svg>DESAFIOS</button>
+  <button data-v="comp"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9 17h6"/></svg>COMPETITIVO</button>
   <button data-v="mais"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>MAIS</button>
 </nav>
 
@@ -494,7 +501,7 @@ function coachLast(a){
 const ML='https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl';
 const MAPIMG={};let _ml=null;
 // cores no padrão do app: fundo preto, ruas em cinza
-const MCOR={background:'#000',water:'#0b0e13',waterway:'#0b0e13',landuse_residential:'#050505',landcover_wood:'#070907',landuse_park:'#070907',building:'#0b0c0e',
+const MCOR={background:'#000',water:'#15324a',waterway:'#1d3f5c',landuse_residential:'#050505',landcover_wood:'#0c1f13',landuse_park:'#0e2416',building:'#0b0c0e',
   highway_path:'#22262c',highway_minor:'#30353c',highway_major_casing:'#000',highway_major_inner:'#3f454e',highway_major_subtle:'#3f454e',
   highway_motorway_casing:'#000',highway_motorway_inner:'#555c66',highway_motorway_subtle:'#555c66',railway:'#2a2e35',railway_minor:'#2a2e35',railway_transit:'#2a2e35'};
 function mlLoad(){
@@ -504,6 +511,12 @@ function mlLoad(){
       for(const l of st.layers){const c=MCOR[l.id],pt=l.paint=l.paint||{};
         if(c)pt[l.type==='background'?'background-color':l.type==='fill'?'fill-color':'line-color']=c;
         if(l.type==='symbol'&&pt['text-color'])pt['text-color']='#6b727c',pt['text-halo-color']='#000'}
+      // verde discreto para parques, praças, gramados e matas (o estilo original não pinta a área dos parques)
+      const wd=st.layers.find(l=>l.id==='landcover_wood');if(wd){delete wd.paint['fill-pattern'];wd.paint['fill-opacity']=.85}
+      const at=st.layers.findIndex(l=>l.id==='building');
+      st.layers.splice(at<0?1:at,0,
+        {id:'bn_verde',type:'fill',source:'openmaptiles','source-layer':'landcover',filter:['match',['get','class'],['grass','wood'],true,false],paint:{'fill-color':'#0b1d11','fill-opacity':.85}},
+        {id:'bn_parque',type:'fill',source:'openmaptiles','source-layer':'park',paint:{'fill-color':'#0e2416','fill-opacity':.9}});
       return st}).catch(e=>{_ml=null;throw e}));
 }
 const mapBox=(id,H)=>{const im=MAPIMG[id+'_'+H];return `<div class="map" data-map="${id}" data-h="${H}" style="height:${H}px">${im?`<img class="mimg" src="${im}" alt="">`:''}<span>© OpenFreeMap · OpenStreetMap</span></div>`};
@@ -573,7 +586,7 @@ function rIni(){
   h+=`<div class="sec">PRÓXIMA ATIVIDADE</div>`;
   if(nx){const adj=adjust(nx,r),st=status(nx),d=parseD(nx.date);
     h+=`<div class="card cur"><div class="row" style="justify-content:space-between"><span class="lbl">${DOW[d.getDay()]} ${nx.date.slice(8)}/${nx.date.slice(5,7)} · ${tipoIc[nx.tipo]}</span>${tagSt[st]}</div><h2 style="margin-top:4px">${esc(nx.titulo)}</h2><div class="meta">${nx.km} km</div>${stepsHtml(nx)}
-    ${adj?`<div class="coach"><b class="bad" style="color:#ff7a66">CLAUDE COACH // AJUSTE PROPOSTO</b>${esc(adj.why)}<div class="row" style="margin-top:8px"><button class="b sm pri" onclick="acceptAdj('${nx.date}')">Aceitar ajuste</button></div></div>`:''}
+    ${adj?`<div class="coach"><b class="bad" style="color:#ff7a66">COACH // AJUSTE PROPOSTO</b>${esc(adj.why)}<div class="row" style="margin-top:8px"><button class="b sm pri" onclick="acceptAdj('${nx.date}')">Aceitar ajuste</button></div></div>`:''}
     ${hasWatch()?`<button class="b pri full" style="margin-top:10px" onclick="sendWatch('${nx.date}')">${st==='enviado'?'Reenviar ao relógio':'▲ Enviar ao relógio'}</button>`:''}
     <div class="grid g2" style="margin-top:8px">${nx.date<=ds?`<button class="b ${hasWatch()?'':'pri'}" onclick="markDone('${nx.date}')">✓ Marcar feito</button>`:`<button class="b" onclick="openDay('${nx.date}')">Ver o dia</button>`}<button class="b" onclick="openBuilder('${nx.date}')">Editar treino</button></div></div>`}
   else if(!isIgor()&&PF)h+=`<div class="card cur"><h2>Plano concluído</h2><p class="empty" style="margin-top:4px">Os treinos deste ciclo acabaram. Responda o questionário de novo para montar o próximo com base no que você fez.</p><button class="b pri full" style="margin-top:10px" onclick="redoPlan()">Montar o próximo plano</button></div>`;
@@ -777,7 +790,7 @@ function rMais(){
   <table style="margin-top:10px"><tr><th>Zona</th><th class="r">FC</th></tr>${z.map((v,i)=>`<tr><td style="font-family:var(--f)">${zn[i]}</td><td class="r">${i?z[i-1]+1:0}–${v}</td></tr>`).join('')}</table>
   <p class="empty" style="margin-top:8px">As zonas vêm do Intervals.icu. Para mudar, edite lá (Configurações → Corrida) e sincronize.</p></div>`;
   h+=`<div class="sec">CONEXÃO</div><details class="card" ${CFG.key?'':'open'}><summary><span>Intervals.icu</span>${CFG.key?'<span class="tag ok">CONECTADO</span>':'<span class="tag bad">SEM CHAVE</span>'}</summary><label class="f">Athlete ID</label><input id="c-ath" value="${esc(CFG.athlete)}" autocomplete="off"><label class="f">Chave de API (fica só neste aparelho)</label><input id="c-key" type="password" value="${esc(CFG.key)}" autocomplete="off"><div class="row" style="margin-top:10px"><button class="b pri" onclick="saveConn()">Salvar e sincronizar</button></div></details>
-  <div class="sec">SOBRE</div><div class="card"><p class="empty">Claude Coach: por enquanto a leitura e os ajustes são calculados no próprio app (carga pela FC, forma, fadiga, VDOT, deriva cardíaca). A conexão com o Claude pela API da Anthropic entra na próxima fase, por um servidor próprio, para a chave não ficar no celular.</p></div>`;
+  <div class="sec">SOBRE</div><div class="card"><p class="empty">Coach: por enquanto a leitura e os ajustes são calculados no próprio app (carga pela FC, forma, fadiga, VDOT, deriva cardíaca). A conexão com o Claude pela API da Anthropic entra na próxima fase, por um servidor próprio, para a chave não ficar no celular.</p></div>`;
   $('#mais').innerHTML=h;
 }
 window.saveConn=()=>{CFG.athlete=$('#c-ath').value.trim();CFG.key=$('#c-key').value.trim();saveCfg();sync(1)};
@@ -817,7 +830,8 @@ window.verMais=()=>{LIM+=8;rPerf()};
 function rPerf(){
   const a=D.athlete||{},runs=D.acts.filter(isRun),B=bests(0),yr=String(TODAY().getFullYear());
   const tot=runs.filter(x=>x.date.slice(0,4)===yr).reduce((s,x)=>s+(x.dist||0),0);
-  let h=`<div class="card cur" style="display:flex;gap:12px;align-items:center"><img src="${esc(a.pic||'logo.png')}" style="width:62px;height:62px;border-radius:50%;border:1px solid var(--blue);object-fit:cover"><div><h2>${esc(a.name||'Atleta')}</h2><div class="meta">${esc(a.city||'')}${a.weight?' · '+a.weight+' kg':''}</div><div class="meta">${runs.length} corridas · ${km(tot)} km em ${yr}</div></div></div>`;
+  let h=`<div class="card cur" style="display:flex;gap:12px;align-items:center"><button onclick="pickFoto()" aria-label="Trocar foto" style="position:relative;flex:none;background:none;border:0;padding:0"><img src="${esc(myPic())}" alt="" style="width:62px;height:62px;border-radius:50%;border:1px solid var(--blue);object-fit:cover;display:block"><span style="position:absolute;right:-2px;bottom:-2px;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#000;font-size:13px;line-height:22px;font-weight:700">✎</span></button><div><h2>${esc(a.name||'Atleta')}</h2><div class="meta">${esc(a.city||'')}${a.weight?' · '+a.weight+' kg':''}</div><div class="meta">${runs.length} corridas · ${km(tot)} km em ${yr}</div></div></div>
+  <div class="row" style="margin:-2px 0 4px;gap:8px"><button class="b sm" onclick="pickFoto()">Trocar foto</button>${LS.get('foto',null)?`<button class="b sm" onclick="resetFoto()">Usar a do Intervals</button>`:''}</div>`;
   h+=`<div class="sec">MELHORES MARCAS<small>BEST EFFORTS</small></div><div class="card"><table><tr><th>Distância</th><th class="r">Tempo</th><th class="r">Ritmo</th><th class="r">Data</th></tr>${BE.map(([d,n])=>{const b=B[d];return `<tr ${b?`onclick="openAct('${b.id}')"`:''}><td>${n}</td><td class="r">${b?fmtT(b.t):'--'}</td><td class="r">${b?fmtP(b.t/d*1000):'--'}</td><td class="r dim">${b?b.date.slice(8,10)+'/'+b.date.slice(5,7)+'/'+b.date.slice(2,4):''}</td></tr>`}).join('')}</table><p class="empty" style="margin-top:6px">Melhor trecho de cada distância dentro das suas corridas (trilhas ficam de fora por causa do GPS). No 1 km, tempo e ritmo são o mesmo número, porque ritmo é o tempo por km.</p></div>`;
   const BL=badgeList(),sorted=[...BL.filter(b=>b.on),...BL.filter(b=>!b.on)];
   h+=`<div class="sec">CONQUISTAS<small>${BL.filter(b=>b.on).length}/${BL.length}</small></div><div class="grid g3">${sorted.slice(0,6).map(badgeHtml).join('')}</div><button class="b more" onclick="openBadges()">Ver todas as conquistas</button>`;
@@ -837,7 +851,7 @@ window.openAct=async id=>{
     h+=`<div class="sec">RITMO × FC</div><svg class="ch" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" style="height:110px;border:1px solid var(--line);border-radius:6px;background:#050505">${pl(P,pmn,pmx,1,'#f2f4ee')}${hv.length?pl(H,hmn,hmx,0,'#e0442f'):''}</svg><div class="row meta" style="gap:14px;margin-top:4px"><span style="color:var(--txt)">━ ritmo (${fmtP(pmn)}–${fmtP(pmx)})</span>${hv.length?`<span style="color:var(--red)">━ FC (${hmn}–${hmx})</span>`:''}</div>`}
   if(x.splits&&x.splits.length){const fast=Math.min(...x.splits.filter(s=>!s.part).map(s=>s.t));
     h+=`<div class="sec">PARCIAIS</div><table><tr><th>KM</th><th class="r">Ritmo</th><th class="r">FC</th><th class="r">Elev.</th></tr>${x.splits.map(s=>{const p=s.part?s.t/s.part*1000:s.t;return `<tr><td>${s.part?s.km.toFixed(2):s.km}</td><td class="r ${!s.part&&s.t===fast?'ok':''}">${fmtP(p)}</td><td class="r">${s.hr||'--'}</td><td class="r dim">${s.el!=null?(s.el>0?'+':'')+s.el:''}</td></tr>`}).join('')}</table>`}
-  if(isRun(a))h+=`<div class="coach" style="margin-top:14px"><b>CLAUDE COACH // LEITURA</b>${esc(coachLast(a))}</div>`;
+  if(isRun(a))h+=`<div class="coach" style="margin-top:14px"><b>COACH // LEITURA</b>${esc(coachLast(a))}</div>`;
   openSheet(h);
 };
 function openSheet(h){const b=$('#sbox'),on=$('#sheet').classList.contains('on');b.innerHTML=h;b.style.transform='';if(!on)b.scrollTop=0;$('#sheet').classList.add('on');drawMaps()}
@@ -1002,8 +1016,149 @@ window.bSave=send=>{
 window.bOff=()=>{if(!confirm('Tirar o treino deste dia? Ele vira dia de descanso.'))return;const ex=LS.get('extra',{});bClear(ex,BD.orig);LS.set('extra',ex);closeSheet();toast('DIA LIVRE');render()};
 window.bOrig=()=>{const ex=LS.get('extra',{});delete ex[BD.orig];LS.set('extra',ex);closeSheet();toast('TREINO ORIGINAL DE VOLTA');render()};
 
+/* ================= COMPETITIVO ================= */
+// locais = agrupamento das corridas (de todos os atletas) pelo centro do trajeto; cada local tem ranking por distância
+// amigos: o Intervals deixa a sua chave ler quem te segue ou te aceita como treinador (o ID aparece em athlete-summary)
+let FR=LS.get('fr',{}),CM=null,CP={i:0,d:0},PLC=[];
+const CDIST=[[1000,'1 KM'],[3000,'3 KM'],[5000,'5 KM'],[10000,'10 KM'],[21097.5,'21 KM']];
+const myPic=()=>LS.get('foto',null)||(D.athlete||{}).pic||'logo.png';
+const dM=(p,q)=>Math.hypot((p[0]-q[0])*111320,(p[1]-q[1])*111320*Math.cos(p[0]*Math.PI/180));
+const cen=tr=>{let a=0,b=0;for(const q of tr){a+=q[0];b+=q[1]}return [a/tr.length,b/tr.length]};
+function bestsOf(a,b0){const b={...(b0||{})};for(const [d] of CDIST)if(a.dist>=d*0.99&&a.dist<=d*1.05&&a.mov){const t=Math.round(a.mov*d/a.dist);if(!b[d]||t<b[d])b[d]=t}return b}
+function people(){
+  const me={id:CFG.athlete,name:((D.athlete||{}).name||'Você'),pic:myPic(),me:1,
+    runs:D.acts.filter(a=>isRun(a)&&AX[a.id]&&AX[a.id].map).map(a=>({id:a.id,date:a.date,dist:a.dist,mov:a.mov,best:bestsOf(a,AX[a.id].best),map:AX[a.id].map}))};
+  return [me,...Object.entries(FR).filter(([id,f])=>id!==CFG.athlete&&f.runs&&f.runs.length).map(([id,f])=>({id,name:f.name||id,pic:f.pic||'logo.png',runs:f.runs}))];
+}
+function buildPlaces(P){
+  const L=[];
+  for(const u of P)for(const r of u.runs){const c=cen(r.map);let pl=L.find(l=>dM(l.c,c)<900);
+    if(!pl){pl={c,runs:[]};L.push(pl)}pl.runs.push({u,r});const n=pl.runs.length;pl.c=[pl.c[0]+(c[0]-pl.c[0])/n,pl.c[1]+(c[1]-pl.c[1])/n]}
+  L.sort((a,b)=>b.runs.length-a.runs.length);
+  L.forEach((pl,i)=>{pl.i=i;pl.key=pl.c[0].toFixed(3)+','+pl.c[1].toFixed(3);pl.km=pl.runs.reduce((s,x)=>s+(x.r.dist||0),0)/1000;pl.users=[...new Set(pl.runs.map(x=>x.u.id))].length;
+    pl.dists=CDIST.filter(([d])=>pl.runs.some(x=>x.r.best&&x.r.best[d]))});
+  return L;
+}
+// ranking de um local numa distância: o melhor tempo de cada atleta
+function board(pl,d){const B={};for(const {u,r} of pl.runs){const t=r.best&&r.best[d];if(t&&(!B[u.id]||t<B[u.id].t))B[u.id]={u,t,date:r.date,id:r.id}}return Object.values(B).sort((a,b)=>a.t-b.t)}
+// pontos: 10 para o 1º, 6 para o 2º, 3 para o 3º em cada distância de cada local
+function ranking(){const R={};for(const pl of PLC)for(const [d] of pl.dists)board(pl,d).forEach((x,i)=>{const o=R[x.u.id]=R[x.u.id]||{u:x.u,pts:0,coroas:0,locais:new Set()};o.pts+=[10,6,3][i]||1;if(!i)o.coroas++;o.locais.add(pl.i)});
+  return Object.values(R).sort((a,b)=>b.pts-a.pts)}
+// nome do local pelo OpenStreetMap (bairro ou rua), guardado no aparelho
+const PN=LS.get('pn',{});let _pnq=Promise.resolve();
+function placeName(pl){
+  if(PN[pl.key])return Promise.resolve(PN[pl.key]);
+  return _pnq=_pnq.then(async()=>{if(PN[pl.key])return PN[pl.key];
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&accept-language=pt-BR&lat=${pl.c[0].toFixed(4)}&lon=${pl.c[1].toFixed(4)}`).then(r=>r.json()),a=r.address||{};
+      PN[pl.key]=a.park||a.leisure||a.neighbourhood||a.suburb||a.road||a.city_district||('Local '+(pl.i+1));LS.set('pn',PN)}catch(e){return 'Local '+(pl.i+1)}
+    await new Promise(r=>setTimeout(r,1100));return PN[pl.key]});
+}
+async function syncFriends(){
+  const ids=new Set(LS.get('amigos',[]));
+  try{(await api('/athlete/0/athlete-summary.json')||[]).forEach(x=>x.athlete_id&&x.athlete_id!==CFG.athlete&&ids.add(x.athlete_id))}catch(e){}
+  for(const id of ids){
+    const f=FR[id]=FR[id]||{runs:[]};
+    try{
+      const [ath,acts]=await Promise.all([api('/athlete/'+id),api(`/athlete/${id}/activities?oldest=${ymd(addD(TODAY(),-365))}&newest=${ymd(addD(TODAY(),1))}`)]);
+      Object.assign(f,{name:ath.name,pic:ath.profile_medium,sex:ath.sex,err:0,at:Date.now()});
+      const have=new Set(f.runs.map(r=>r.id));
+      for(const a of (acts||[]).filter(a=>isRun(a)&&a.distance&&!have.has(a.id)).slice(0,60)){
+        try{const s=await api(`/activity/${a.id}/streams?types=time,distance,latlng`),g=k=>(s.find(x=>x.type===k)||{}),x=analyze(g('time').data||[],g('distance').data||[],[],[],g('latlng'));
+          if(x.map)f.runs.push({id:a.id,date:a.start_date_local,dist:a.distance,mov:a.moving_time,best:bestsOf({dist:a.distance,mov:a.moving_time},x.best),map:x.map.filter((_,i)=>i%2===0||i===x.map.length-1)})}catch(e){}
+      }
+    }catch(e){f.err=e.message==='HTTP 403'||e.message==='HTTP 401'?'SEM ACESSO':e.message}
+  }
+  LS.set('fr',FR);
+}
+function compData(){
+  const P=people();PLC=buildPlaces(P);
+  const lines={type:'FeatureCollection',features:P.flatMap(u=>u.runs.map(r=>({type:'Feature',properties:{me:u.me?1:0},geometry:{type:'LineString',coordinates:r.map.map(q=>[q[1],q[0]])}})))};
+  const pts={type:'FeatureCollection',features:PLC.map(pl=>({type:'Feature',properties:{i:pl.i,n:pl.runs.length},geometry:{type:'Point',coordinates:[pl.c[1],pl.c[0]]}}))};
+  return {P,lines,pts};
+}
+function rComp(){
+  const el=$('#comp');
+  if(!$('#cmap'))el.innerHTML=`<div id="cmap"></div><div class="cbar"><span class="chip" id="c-info">CARREGANDO…</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="chip b" onclick="openRank()">RANKING</button><button class="chip b" onclick="openFriends()">AMIGOS</button></span></div><button class="fab" onclick="locateMe(1)" aria-label="Onde estou">◎</button>`;
+  const {P,lines,pts}=compData();
+  $('#c-info').textContent=`${PLC.length} ${PLC.length===1?'LOCAL':'LOCAIS'} · ${P.length} ${P.length===1?'ATLETA':'ATLETAS'}`;
+  mlLoad().then(st=>{
+    if(CM){CM.resize();if(CM.isStyleLoaded()&&CM.getSource('trk')){CM.getSource('trk').setData(lines);CM.getSource('plc').setData(pts)}return}
+    CM=new maplibregl.Map({container:'cmap',style:structuredClone(st),center:PLC.length?[PLC[0].c[1],PLC[0].c[0]]:[-48.277,-18.918],zoom:13,dragRotate:false,pitchWithRotate:false,attributionControl:{compact:true,customAttribution:'OpenFreeMap'}});
+    CM.touchZoomRotate.disableRotation();
+    CM.on('load',()=>{
+      const d=compData();
+      CM.addSource('trk',{type:'geojson',data:d.lines});CM.addSource('plc',{type:'geojson',data:d.pts});CM.addSource('eu',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+      CM.addLayer({id:'trk',type:'line',source:'trk',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':['case',['==',['get','me'],1],'#4a9eff','#9fd0ff'],'line-opacity':.42,'line-width':['interpolate',['linear'],['zoom'],11,1.2,16,3]}});
+      CM.addLayer({id:'plc',type:'circle',source:'plc',paint:{'circle-radius':['interpolate',['linear'],['get','n'],1,9,10,13,40,18],'circle-color':'#4a9eff','circle-stroke-color':'#fff','circle-stroke-width':2}});
+      CM.addLayer({id:'plcn',type:'symbol',source:'plc',layout:{'text-field':['to-string',['get','n']],'text-font':['Noto Sans Regular'],'text-size':11,'text-allow-overlap':true},paint:{'text-color':'#fff'}});
+      CM.addLayer({id:'eu0',type:'circle',source:'eu',paint:{'circle-radius':16,'circle-color':'#4a9eff','circle-opacity':.2}});
+      CM.addLayer({id:'eu',type:'circle',source:'eu',paint:{'circle-radius':6,'circle-color':'#fff','circle-stroke-color':'#4a9eff','circle-stroke-width':3}});
+      CM.on('click','plc',e=>{const f=e.features[0];if(f)openPlace(f.properties.i)});
+      CM.on('mouseenter','plc',()=>CM.getCanvas().style.cursor='pointer');
+      if(PLC.length>1){const b=PLC.slice(0,8).reduce((b,pl)=>b.extend([pl.c[1],pl.c[0]]),new maplibregl.LngLatBounds([PLC[0].c[1],PLC[0].c[0]],[PLC[0].c[1],PLC[0].c[0]]));CM.fitBounds(b,{padding:70,maxZoom:14,animate:false})}
+      locateMe(0);
+    });
+  }).catch(()=>{$('#c-info').textContent='MAPA INDISPONÍVEL SEM INTERNET'});
+  if(!LS.get('frAt',0)||Date.now()-LS.get('frAt',0)>3600e3){LS.set('frAt',Date.now());syncFriends().then(()=>VIEW==='comp'&&rComp())}
+}
+window.locateMe=fly=>{
+  if(!navigator.geolocation)return fly&&toast('GPS INDISPONÍVEL');
+  navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];
+    if(CM&&CM.getSource('eu'))CM.getSource('eu').setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}]});
+    if(fly&&CM)CM.flyTo({center:c,zoom:14.5})},
+    ()=>fly&&toast('PERMITA A LOCALIZAÇÃO NOS AJUSTES DO IPHONE',3500),{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+};
+const medal=i=>['🥇','🥈','🥉'][i]||(i+1)+'º';
+const avatar=(u,s=30)=>`<img src="${esc(u.pic)}" alt="" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:1px solid ${u.me?'var(--blue)':'var(--line)'};flex:none">`;
+window.openPlace=(i,d)=>{
+  const pl=PLC[i];if(!pl)return;CP.i=i;
+  if(d)CP.d=d;if(!pl.dists.some(([x])=>x===CP.d))CP.d=(pl.dists.find(([x])=>x===5000)||pl.dists[0]||[0])[0];
+  const B=CP.d?board(pl,CP.d):[],meI=B.findIndex(x=>x.u.me),lenda={};pl.runs.forEach(x=>{lenda[x.u.id]=lenda[x.u.id]||{u:x.u,n:0};lenda[x.u.id].n++});
+  const L=Object.values(lenda).sort((a,b)=>b.n-a.n);
+  let h=`<div class="hd"><b id="pl-nm">${esc(PN[pl.key]||'LOCAL '+(i+1))}</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <div class="meta">${pl.runs.length} corridas · ${pl.users} ${pl.users===1?'atleta':'atletas'} · ${km(pl.km*1000)} km no total</div>`;
+  if(pl.dists.length){
+    h+=`<div class="seg" style="margin:12px 0 10px">${pl.dists.map(([x,n])=>`<button class="${CP.d===x?'on':''}" onclick="openPlace(${i},${x})">${n}</button>`).join('')}</div>
+    <div class="card" style="padding:4px 12px">${B.map((x,j)=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:9px 0;border-bottom:1px solid #15181d" onclick="${x.u.me?`openAct('${x.id}')`:''}"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u)}<span style="flex:1;min-width:0"><b style="display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">${fmtD(x.date)}/${x.date.slice(2,4)}</span></span><span style="text-align:right"><span class="num" style="display:block">${fmtT(x.t)}</span><span class="meta">${fmtP(x.t/CP.d*1000)}/km</span></span></div>`).join('')}</div>
+    ${meI>0?`<div class="card cur"><div class="lbl" style="color:var(--blue)">SUA MARCA</div><p class="empty" style="margin-top:4px;color:var(--txt)">Você está em ${meI+1}º. Faltam <b style="color:#fff">${fmtT(B[meI].t-B[0].t)}</b> para tomar o 1º lugar de ${esc(B[0].u.name.split(' ')[0])} (ritmo de ${fmtP(B[0].t/CP.d*1000)}/km).</p></div>`:meI===0?`<div class="card cur"><div class="lbl" style="color:var(--blue)">👑 O LOCAL É SEU</div><p class="empty" style="margin-top:4px;color:var(--txt)">Você tem o melhor tempo de ${CDIST.find(([x])=>x===CP.d)[1].toLowerCase()} aqui.${B[1]?` ${esc(B[1].u.name.split(' ')[0])} está ${fmtT(B[1].t-B[0].t)} atrás.`:' Chame os amigos para disputar.'}</p></div>`:CP.d?`<p class="empty" style="margin:8px 0">Você ainda não tem marca nessa distância aqui.</p>`:''}`;
+  }else h+=`<p class="empty" style="margin:12px 0">Nenhuma corrida com 1 km completo neste local ainda.</p>`;
+  h+=`<div class="sec">LENDA DO LOCAL<small>MAIS CORRIDAS AQUI</small></div><div class="card" style="padding:4px 12px">${L.slice(0,5).map((x,j)=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:8px 0;border-bottom:1px solid #15181d"><span class="num" style="width:28px;text-align:center">${j?j+1+'º':'⭐'}</span>${avatar(x.u,26)}<span style="flex:1;font-size:13px">${esc(x.u.name)}</span><span class="num" style="font-size:13px">${x.n}<small class="dim"> ${x.n===1?'corrida':'corridas'}</small></span></div>`).join('')}</div>`;
+  openSheet(h);
+  if(!PN[pl.key])placeName(pl).then(n=>{const e=$('#pl-nm');if(e&&CP.i===i)e.textContent=n});
+};
+window.openRank=()=>{
+  const R=ranking();
+  let h=`<div class="hd"><b>RANKING GERAL</b><button class="b sm" onclick="closeSheet()">✕</button></div><p class="empty">Em cada local e distância, o 1º lugar vale 10 pontos, o 2º vale 6, o 3º vale 3 e os demais 1. 👑 é quantas vezes a pessoa é a mais rápida.</p>
+  <div class="card" style="padding:4px 12px;margin-top:10px">${R.map((x,j)=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:10px 0;border-bottom:1px solid #15181d"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u,34)}<span style="flex:1;min-width:0"><b style="display:block;font-size:14px;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">👑 ${x.coroas} · ${x.locais.size} ${x.locais.size===1?'local':'locais'}</span></span><span class="num" style="font-size:18px">${x.pts}<small class="dim"> pts</small></span></div>`).join('')||'<p class="empty" style="padding:10px 0">Sem corridas com GPS ainda.</p>'}</div>
+  ${R.length<2?`<p class="empty">Por enquanto só você aparece. Toque em AMIGOS para ligar o André e os outros.</p>`:''}`;
+  openSheet(h);
+};
+window.openFriends=()=>{
+  const ids=[...new Set([...LS.get('amigos',[]),...Object.keys(FR)])].filter(id=>id!==CFG.athlete);
+  openSheet(`<div class="hd"><b>AMIGOS</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <p class="empty">Para as marcas de um amigo aparecerem aqui, ele precisa liberar a conta dele para você no Intervals.icu: no site, ele te adiciona como seguidor ou treinador, e você aceita. Faça o mesmo por ele, para ele ver as suas.</p>
+  <div class="card" style="margin-top:10px;padding:4px 12px">${ids.map(id=>{const f=FR[id]||{};return `<div class="row" style="flex-wrap:nowrap;gap:10px;padding:9px 0;border-bottom:1px solid #15181d">${avatar({pic:f.pic||'logo.png'},30)}<span style="flex:1;min-width:0"><b style="display:block;font-size:13px">${esc(f.name||id)}</b><span class="meta">${esc(id)} · ${f.err?'<span class="bad">'+esc(f.err)+'</span>':f.runs?f.runs.length+' corridas com GPS':'ainda não lido'}</span></span><button class="b sm" onclick="delFriend('${esc(id)}')" aria-label="Remover">✕</button></div>`}).join('')||'<p class="empty" style="padding:10px 0">Nenhum amigo ainda.</p>'}</div>
+  <label class="f">Athlete ID do amigo</label><input id="f-id" placeholder="Ex.: i123456" autocomplete="off" autocapitalize="off">
+  <div class="grid g2" style="margin-top:10px"><button class="b pri" onclick="addFriend()">Adicionar</button><button class="b" onclick="refreshFriends()">Atualizar marcas</button></div>`);
+};
+window.addFriend=async()=>{let id=$('#f-id').value.trim();if(!id)return;if(/^\d+$/.test(id))id='i'+id;const L=LS.get('amigos',[]);if(!L.includes(id))L.push(id);LS.set('amigos',L);toast('LENDO AS CORRIDAS…');await syncFriends();openFriends();rComp()};
+window.delFriend=id=>{if(!confirm('Tirar este amigo do Competitivo?'))return;LS.set('amigos',LS.get('amigos',[]).filter(x=>x!==id));delete FR[id];LS.set('fr',FR);openFriends();rComp()};
+window.refreshFriends=async()=>{toast('ATUALIZANDO…');await syncFriends();LS.set('frAt',Date.now());openFriends();rComp();toast('MARCAS ATUALIZADAS')};
+
+/* ================= foto de perfil ================= */
+window.pickFoto=()=>{
+  const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+  inp.onchange=()=>{const f=inp.files[0];if(!f)return;const im=new Image();
+    im.onload=()=>{const c=document.createElement('canvas'),s=320,k=Math.min(im.width,im.height);c.width=c.height=s;
+      c.getContext('2d').drawImage(im,(im.width-k)/2,(im.height-k)/2,k,k,0,0,s,s);URL.revokeObjectURL(im.src);
+      LS.set('foto',c.toDataURL('image/jpeg',.86));toast('FOTO ATUALIZADA');render()};
+    im.src=URL.createObjectURL(f)};
+  inp.click();
+};
+window.resetFoto=()=>{LS.set('foto',null);render()};
+
 /* ================= navegação ================= */
-const TITLES={ini:'INÍCIO',cal:'CALENDÁRIO',des:'DESAFIOS',mais:'MAIS',perf:'PERFIL'};
+const TITLES={ini:'INÍCIO',cal:'CALENDÁRIO',des:'DESAFIOS',comp:'COMPETITIVO',mais:'MAIS',perf:'PERFIL'};
 let VIEW='ini';
 function go2(v){document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.v===v))}
 function go(v){VIEW=v;go2(v);render()}
@@ -1015,9 +1170,9 @@ function render(){
   if(ob){document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-ini'));$('#ttl').textContent='BOAS-VINDAS';rOB();return}
   if(VIEW==='ini'||!$('#v-'+VIEW).classList.contains('on'))go2(VIEW);
   $('#ttl').textContent=TITLES[VIEW];
-  const a=D.athlete;if(a&&a.pic)$('#avimg').src=a.pic;
+  $('#avimg').src=myPic();
   $('#avst').className=D.at&&Date.now()-D.at<864e5?'on':D.at?'off':'';
-  ({ini:rIni,cal:rCal,des:rDes,mais:rMais,perf:rPerf})[VIEW]();
+  ({ini:rIni,cal:rCal,des:rDes,comp:rComp,mais:rMais,perf:rPerf})[VIEW]();
   drawMaps();
 }
 window.sync=sync;window.sendWatch=sendWatch;
