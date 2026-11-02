@@ -130,6 +130,16 @@ svg.ch{width:100%;display:block}
 .feel button{flex:1;min-height:44px;background:#070707;border:1px solid var(--line);border-radius:6px;font-family:var(--m);color:var(--dim)}
 .feel button.on{border-color:var(--blue);color:var(--blue);background:#0a1828}
 .map{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#000}.map .mimg{position:absolute;inset:0;width:100%;height:100%;display:block}.map span{position:absolute;right:6px;bottom:3px;z-index:2;font-size:8px;color:#5c636d;letter-spacing:.02em}
+#recfab{position:absolute;z-index:8;right:16px;bottom:calc(74px + env(safe-area-inset-bottom));height:58px;min-width:58px;border-radius:29px;background:rgba(5,5,5,.92);border:1px solid var(--blue);display:none;align-items:center;justify-content:center;gap:9px;padding:0 17px;box-shadow:0 6px 22px rgba(0,0,0,.7)}
+#recfab.on{display:flex}#recfab i{width:20px;height:20px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px rgba(224,68,47,.22);flex:none}
+#recfab span{display:none;font-family:var(--m);font-size:14px;color:#fff;font-weight:600}#recfab.live{right:auto;left:50%;transform:translateX(-50%)}#recfab.live span{display:inline}#recfab.live i{animation:pl 1.2s infinite}@keyframes pl{50%{opacity:.3}}
+#v-ini{padding-bottom:96px}
+#rec{position:absolute;inset:0;z-index:15;background:#000;display:none;flex-direction:column}#rec.on{display:flex}
+.rtop{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;border-bottom:1px solid var(--line);background:linear-gradient(var(--panel),#080808)}
+#rmap{flex:1 1 auto;min-height:150px;position:relative;background:#000}#r-st:empty{display:none}
+.rmet{padding:8px 14px 0}.rbig{text-align:center;font-family:var(--m);font-size:52px;font-weight:700;color:#fff;line-height:1.05}
+.rctl{display:flex;justify-content:center;gap:22px;padding:14px 0 calc(16px + env(safe-area-inset-bottom))}
+.rbtn{width:80px;height:80px;border-radius:50%;border:2px solid var(--blue);background:#0a1828;color:var(--blue);font-size:11px;letter-spacing:.1em;font-weight:600;padding:0}.rbtn.red{border-color:var(--red);background:#1a0805;color:#ff7a66}.rbtn.amb{border-color:var(--amber);background:#1a1405;color:var(--amber)}
 #v-comp{padding:0;overflow:hidden}#comp{max-width:none;height:100%;position:relative}#cmap{position:absolute;inset:0;background:#000}
 .cbar{position:absolute;z-index:3;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:6px;pointer-events:none}.cbar>*{pointer-events:auto}
 .chip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:18px;background:rgba(5,5,5,.86);border:1px solid var(--line);color:var(--txt);font-size:10px;letter-spacing:.1em;white-space:nowrap}.chip.b{color:var(--blue);border-color:var(--blue);min-width:0}
@@ -178,6 +188,8 @@ select{min-height:44px}
 </nav>
 
 <div id="sheet"><div class="box" id="sbox"></div></div>
+<button id="recfab" onclick="openRec()" aria-label="Gravar corrida"><i></i><span id="recfab-t"></span></button>
+<div id="rec"></div>
 <div id="toast"></div>
 
 <script src="config.local.js" onerror="void 0"></script>
@@ -852,6 +864,7 @@ window.openAct=async id=>{
   if(x.splits&&x.splits.length){const fast=Math.min(...x.splits.filter(s=>!s.part).map(s=>s.t));
     h+=`<div class="sec">PARCIAIS</div><table><tr><th>KM</th><th class="r">Ritmo</th><th class="r">FC</th><th class="r">Elev.</th></tr>${x.splits.map(s=>{const p=s.part?s.t/s.part*1000:s.t;return `<tr><td>${s.part?s.km.toFixed(2):s.km}</td><td class="r ${!s.part&&s.t===fast?'ok':''}">${fmtP(p)}</td><td class="r">${s.hr||'--'}</td><td class="r dim">${s.el!=null?(s.el>0?'+':'')+s.el:''}</td></tr>`}).join('')}</table>`}
   if(isRun(a))h+=`<div class="coach" style="margin-top:14px"><b>COACH // LEITURA</b>${esc(coachLast(a))}</div>`;
+  if(a.gpx&&isMan(a))h+=`<div class="card alert" style="margin-top:12px"><div class="lbl bad">AINDA NÃO ESTÁ NO INTERVALS</div><p class="empty" style="margin-top:4px">Esta corrida foi gravada no celular, mas o envio falhou. Ela já conta aqui no app.</p><button class="b pri full" style="margin-top:8px" onclick="resendGpx('${a.id}')">Enviar ao Intervals</button></div>`;
   openSheet(h);
 };
 function openSheet(h){const b=$('#sbox'),on=$('#sheet').classList.contains('on');b.innerHTML=h;b.style.transform='';if(!on)b.scrollTop=0;$('#sheet').classList.add('on');drawMaps()}
@@ -1157,6 +1170,133 @@ window.pickFoto=()=>{
 };
 window.resetFoto=()=>{LS.set('foto',null);render()};
 
+/* ================= gravar corrida (GPS do celular) ================= */
+// para quem não tem relógio: grava pelo celular e manda ao Intervals como arquivo GPX (pausas viram trechos separados)
+// pontos: [hora ms, lat, lon, altitude, trecho]
+let REC=LS.get('rec',null),RM=null,RWID=null,RTK=null,WL=null,FIX=null;
+const hav=(a,b)=>{const r=Math.PI/180,x=Math.sin((b[0]-a[0])*r/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin((b[1]-a[1])*r/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
+const recLive=()=>!!REC&&REC.st!=='idle';
+const recMov=()=>REC?(REC.mov+(REC.st==='run'?Date.now()-REC.since:0))/1000:0;
+const recKeep=()=>LS.set('rec',REC);
+const isoLocal=ms=>{const d=new Date(ms);return ymd(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())};
+const say=t=>{if(!LS.get('voz',1)||!window.speechSynthesis)return;try{const u=new SpeechSynthesisUtterance(t);u.lang='pt-BR';u.rate=1.05;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}};
+const paceVoz=s=>{s=Math.round(s);return Math.floor(s/60)+' e '+(s%60)};
+async function wake(on){try{if(on&&!WL&&navigator.wakeLock){WL=await navigator.wakeLock.request('screen');WL.addEventListener('release',()=>{WL=null})}else if(!on&&WL){await WL.release();WL=null}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&recLive())wake(1)});
+function onPos(p){
+  const c=p.coords;FIX={acc:c.accuracy,ll:[c.latitude,c.longitude],t:Date.now()};
+  if(REC&&REC.st==='run'&&c.accuracy<=35){
+    const q=[p.timestamp||Date.now(),+c.latitude.toFixed(6),+c.longitude.toFixed(6),c.altitude!=null?Math.round(c.altitude*10)/10:null,REC.seg],L=REC.pts[REC.pts.length-1];
+    let ok=true;
+    if(L&&L[4]===q[4]){const d=hav([L[1],L[2]],[q[1],q[2]]),dt=(q[0]-L[0])/1000;
+      if(dt<=0||d/dt>12)ok=false; // salto de GPS
+      else if(d<4&&dt<5)ok=false; // parado no lugar: não repete ponto
+      else{const b=REC.dist;REC.dist+=d;if(Math.floor(REC.dist/1000)>Math.floor(b/1000)){const k=Math.floor(REC.dist/1000),t=recMov(),sp=t-REC.splits.reduce((s,x)=>s+x,0);REC.splits.push(sp);say(`${k} ${k>1?'quilômetros':'quilômetro'}. Ritmo ${paceVoz(sp)}.`)}}}
+    if(ok){REC.pts.push(q);recKeep()}
+  }
+  recDraw();recUI();
+}
+function recWatch(on){
+  if(on&&RWID==null&&navigator.geolocation)RWID=navigator.geolocation.watchPosition(onPos,e=>{FIX=null;recUI();if(e.code===1)toast('PERMITA A LOCALIZAÇÃO NOS AJUSTES DO IPHONE',4000)},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  if(!on&&RWID!=null){navigator.geolocation.clearWatch(RWID);RWID=null}
+}
+// ritmo atual: últimos 30 s do trecho em andamento
+function curPace(){const P=REC&&REC.pts,n=P?P.length:0;if(n<2||REC.st!=='run'||Date.now()-P[n-1][0]>15000)return null;let i=n-1,d=0;
+  while(i>0&&P[n-1][0]-P[i-1][0]<=30000&&P[i-1][4]===P[n-1][4]){d+=hav([P[i-1][1],P[i-1][2]],[P[i][1],P[i][2]]);i--}
+  const dt=(P[n-1][0]-P[i][0])/1000;return d>15&&dt>0?dt/d*1000:null}
+function recUI(){
+  const fb=$('#recfab-t');if(fb)fb.textContent=REC?fmtT(recMov()):'';
+  if(!$('#rec').classList.contains('on'))return;
+  const st=REC?REC.st:'idle',t=recMov(),d=REC?REC.dist:0,done=REC?REC.splits.reduce((s,x)=>s+x,0):0;
+  $('#r-t').textContent=fmtT(t);$('#r-d').innerHTML=(d/1000).toFixed(2)+'<small> km</small>';
+  $('#r-pa').innerHTML=fmtP(curPace())+'<small>/km</small>';$('#r-pm').innerHTML=(d>50?fmtP(t/d*1000):'--')+'<small>/km</small>';
+  const kd=d%1000;$('#r-pk').innerHTML=(kd>50?fmtP((t-done)/kd*1000):'--')+`<small> km ${Math.floor(d/1000)+1}</small>`;
+  $('#r-gps').innerHTML=!FIX?'<span class="warn">PROCURANDO GPS…</span>':FIX.acc<=12?'<span class="ok">GPS ÓTIMO</span>':FIX.acc<=30?'<span class="ok">GPS BOM</span>':'<span class="bad">GPS FRACO</span>';
+  $('#r-min').textContent=st==='idle'?'✕':'⌄';
+  const want=st==='idle'?'i':st;if($('#r-ctl').dataset.st!==want){$('#r-ctl').dataset.st=want;
+    $('#r-ctl').innerHTML=st==='idle'?`<button class="rbtn" onclick="recGo()">INICIAR</button>`:st==='run'?`<button class="rbtn amb" onclick="recPause()">PAUSAR</button>`:`<button class="rbtn" onclick="recGo()">CONTINUAR</button><button class="rbtn red" onclick="recEnd()">FINALIZAR</button>`}
+  $('#r-st').textContent=st==='pause'?'PAUSADO':st==='run'?'GRAVANDO':'';
+}
+function recDraw(){
+  if(!RM||!RM.getSource('rt'))return;
+  const segs={};(REC?REC.pts:[]).forEach(q=>(segs[q[4]]=segs[q[4]]||[]).push([q[2],q[1]]));
+  RM.getSource('rt').setData({type:'Feature',geometry:{type:'MultiLineString',coordinates:Object.values(segs).filter(s=>s.length>1)}});
+  if(FIX){const c=[FIX.ll[1],FIX.ll[0]];RM.getSource('me').setData({type:'Feature',geometry:{type:'Point',coordinates:c}});
+    if(!RM._fixou){RM.jumpTo({center:c,zoom:16});RM._fixou=1}else if(recLive())RM.easeTo({center:c,duration:600})}
+}
+window.openRec=()=>{
+  if(!CFG.key)return toast('CONECTE O INTERVALS EM MAIS');
+  const el=$('#rec');
+  if(!el.innerHTML){const p=planOn(ymd(TODAY()));
+    el.innerHTML=`<div class="rtop"><button class="b sm" id="r-min" onclick="closeRec()" aria-label="Fechar">✕</button><div style="text-align:center"><b style="font-size:12px;letter-spacing:.14em;color:var(--amber)">GRAVAR CORRIDA</b><div class="meta" id="r-gps"></div></div><button class="b sm" id="r-voz" onclick="togVoz()" aria-label="Voz"></button></div>
+    <div id="rmap"><span class="chip" id="r-st" style="position:absolute;z-index:2;left:10px;top:10px;color:var(--red);border-color:var(--red)"></span></div>
+    <div class="rmet"><div class="meta" style="text-align:center;min-height:14px">${p?'Treino de hoje: '+esc(p.titulo):''}</div><div class="rbig" id="r-t">0:00</div><div class="lbl" style="text-align:center;margin-top:3px">TEMPO EM MOVIMENTO</div>
+    <div class="grid g2" style="margin-top:12px"><div class="cell"><div class="lbl">Distância</div><span class="num big" id="r-d"></span></div><div class="cell"><div class="lbl">Ritmo atual</div><span class="num big" id="r-pa"></span></div><div class="cell"><div class="lbl">Ritmo médio</div><span class="num" id="r-pm"></span></div><div class="cell"><div class="lbl">Km atual</div><span class="num" id="r-pk"></span></div></div></div>
+    <div class="rctl" id="r-ctl"></div>`}
+  $('#r-voz').textContent=LS.get('voz',1)?'🔊':'🔇';
+  el.classList.add('on');$('#recfab').classList.remove('on');recWatch(1);
+  clearInterval(RTK);RTK=setInterval(recUI,1000);recUI();
+  mlLoad().then(st=>{
+    if(RM){RM.resize();recDraw();return}
+    RM=new maplibregl.Map({container:'rmap',style:structuredClone(st),center:FIX?[FIX.ll[1],FIX.ll[0]]:[-48.277,-18.918],zoom:FIX?16:12,dragRotate:false,pitchWithRotate:false,attributionControl:{compact:true,customAttribution:'OpenFreeMap'}});
+    RM.on('load',()=>{
+      RM.addSource('rt',{type:'geojson',data:{type:'Feature',geometry:{type:'MultiLineString',coordinates:[]}}});RM.addSource('me',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+      RM.addLayer({id:'rt0',type:'line',source:'rt',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':'#000','line-opacity':.6,'line-width':8}});
+      RM.addLayer({id:'rt1',type:'line',source:'rt',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':'#4a9eff','line-width':4.5}});
+      RM.addLayer({id:'me0',type:'circle',source:'me',paint:{'circle-radius':18,'circle-color':'#4a9eff','circle-opacity':.2}});
+      RM.addLayer({id:'me',type:'circle',source:'me',paint:{'circle-radius':7,'circle-color':'#fff','circle-stroke-color':'#4a9eff','circle-stroke-width':3}});
+      recDraw()});
+  }).catch(()=>{});
+};
+window.closeRec=()=>{$('#rec').classList.remove('on');if(!recLive()){recWatch(0);clearInterval(RTK);RTK=null}render()};
+window.togVoz=()=>{LS.set('voz',LS.get('voz',1)?0:1);$('#r-voz').textContent=LS.get('voz',1)?'🔊':'🔇'};
+window.recGo=()=>{
+  if(!REC||REC.st==='idle'){REC={st:'run',seg:0,pts:[],dist:0,mov:0,since:Date.now(),splits:[],t0:Date.now()};say('Gravação iniciada. Bom treino.')}
+  else if(REC.st==='pause'){REC.st='run';REC.since=Date.now();REC.seg++;say('Continuando.')}
+  recKeep();wake(1);recUI();
+};
+window.recPause=()=>{if(!REC||REC.st!=='run')return;REC.mov+=Date.now()-REC.since;REC.st='pause';recKeep();say('Pausado.');recUI()};
+function recStats(){const P=REC.pts,t0=P.length?P[0][0]:REC.t0,t=[],d=[];let c=0;P.forEach((q,i)=>{if(i&&P[i-1][4]===q[4])c+=hav([P[i-1][1],P[i-1][2]],[q[1],q[2]]);t.push((q[0]-t0)/1000);d.push(c)});return {t0,t,d}}
+window.recEnd=()=>{
+  if(REC.st==='run')recPause();
+  if(REC.dist<50&&!confirm('A corrida tem menos de 50 m. Finalizar mesmo assim?'))return;
+  const mv=recMov(),p=planOn(ymd(TODAY()));
+  openSheet(`<div class="hd"><b>CORRIDA FINALIZADA</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <div class="grid g3"><div class="cell"><div class="lbl">Distância</div><span class="num">${km(REC.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(mv)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${REC.dist>50?fmtP(mv/REC.dist*1000):'--'}</span></div></div>
+  ${REC.splits.length?`<div class="sec">PARCIAIS</div><table><tr><th>KM</th><th class="r">Ritmo</th></tr>${REC.splits.map((s,i)=>`<tr><td>${i+1}</td><td class="r">${fmtP(s)}</td></tr>`).join('')}</table>`:''}
+  <label class="f">Nome da corrida</label><input id="r-nome" value="${esc(p?p.titulo:'Corrida')}">
+  <button class="b pri full" style="margin-top:14px" onclick="recSave()">Salvar</button>
+  <div class="grid g2" style="margin-top:8px"><button class="b" onclick="closeSheet()">Voltar a gravar</button><button class="b red" onclick="recTrash()">Descartar</button></div>`);
+};
+window.recTrash=()=>{if(!confirm('Descartar esta corrida? Ela não poderá ser recuperada.'))return;recClear();closeSheet();toast('CORRIDA DESCARTADA')};
+function recClear(){REC=null;LS.set('rec',null);wake(0);recWatch(0);clearInterval(RTK);RTK=null;$('#rec').classList.remove('on');$('#rec').innerHTML='';if(RM){RM.remove();RM=null}render()}
+function toGpx(name){
+  let s=`<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Boonie Run" xmlns="http://www.topografix.com/GPX/1/1"><metadata><time>${new Date(REC.pts[0][0]).toISOString()}</time></metadata><trk><name>${esc(name)}</name><type>running</type>`,seg=null;
+  for(const q of REC.pts){if(q[4]!==seg){if(seg!==null)s+='</trkseg>';s+='<trkseg>';seg=q[4]}s+=`<trkpt lat="${q[1]}" lon="${q[2]}">${q[3]!=null?`<ele>${q[3]}</ele>`:''}<time>${new Date(q[0]).toISOString()}</time></trkpt>`}
+  return s+'</trkseg></trk></gpx>';
+}
+async function upGpx(name,gpx){
+  const fd=new FormData();fd.append('file',new Blob([gpx],{type:'application/gpx+xml'}),'boonie-run.gpx');
+  const r=await fetch(`${API}/athlete/${CFG.athlete}/activities?name=${encodeURIComponent(name)}`,{method:'POST',headers:{Authorization:'Basic '+btoa('API_KEY:'+CFG.key)},body:fd});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+}
+window.recSave=async()=>{
+  if(!REC.pts.length)return toast('SEM PONTOS DE GPS PARA SALVAR');
+  const name=$('#r-nome').value.trim()||'Corrida',gpx=toGpx(name),btn=document.querySelector('#sbox .b.pri');btn.disabled=true;btn.textContent='Enviando…';
+  try{await upGpx(name,gpx);toast('CORRIDA SALVA NO INTERVALS',3000);closeSheet();recClear();setTimeout(()=>sync(0),5000)}
+  catch(e){ // sem internet ou o Intervals recusou: guarda no celular e deixa reenviar depois
+    const {t0,t,d}=recStats(),id='man-'+Date.now();
+    AX[id]=analyze(t,d,[],[],{data:REC.pts.map(q=>q[1]),data2:REC.pts.map(q=>q[2])});LS.set('ax5',AX);LS.set('gpx.'+id,gpx);
+    MAN.push({id,date:isoLocal(t0),type:'Run',name,dist:Math.round(REC.dist),mov:Math.round(recMov()),el:Math.round(t[t.length-1]||0),src:'APP',gpx:1});LS.set('man',MAN);
+    D.acts=withMan(D.acts);LS.set('data',D);closeSheet();recClear();toast('SALVA NESTE CELULAR // REENVIE PELO DETALHE DA CORRIDA',4500)}
+};
+window.resendGpx=async id=>{
+  const a=MAN.find(m=>m.id===id),gpx=LS.get('gpx.'+id,null);if(!a||!gpx)return;
+  try{await upGpx(a.name,gpx);MAN=MAN.filter(m=>m.id!==id);LS.set('man',MAN);LS.set('gpx.'+id,null);D.acts=withMan(D.acts);LS.set('data',D);closeSheet();toast('ENVIADA AO INTERVALS',3000);setTimeout(()=>sync(0),5000)}
+  catch(e){toast('AINDA NÃO DEU // '+e.message,3500)}
+};
+if(recLive()){recWatch(1);RTK=setInterval(recUI,1000)}
+
 /* ================= navegação ================= */
 const TITLES={ini:'INÍCIO',cal:'CALENDÁRIO',des:'DESAFIOS',comp:'COMPETITIVO',mais:'MAIS',perf:'PERFIL'};
 let VIEW='ini';
@@ -1167,6 +1307,7 @@ $('#av').onclick=()=>go(VIEW==='perf'?'ini':'perf');
 $('#sync').onclick=()=>sync(0);
 function render(){
   const ob=needOB();document.body.classList.toggle('ob',ob);
+  const fab=$('#recfab');fab.classList.toggle('on',!ob&&!!CFG.key&&(VIEW==='ini'||recLive())&&!$('#rec').classList.contains('on'));fab.classList.toggle('live',recLive());
   if(ob){document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-ini'));$('#ttl').textContent='BOAS-VINDAS';rOB();return}
   if(VIEW==='ini'||!$('#v-'+VIEW).classList.contains('on'))go2(VIEW);
   $('#ttl').textContent=TITLES[VIEW];
