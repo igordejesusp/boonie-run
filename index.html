@@ -978,18 +978,95 @@ function rPerf(){
   $('#perf').innerHTML=h;
 }
 
+/* ================= etapas (voltas) do relógio: lê o arquivo original .fit da corrida ================= */
+// formato FIT da Garmin: cabeçalho, mensagens de definição e de dados; só as voltas (mensagem 19) interessam
+function fitLaps(buf){
+  const dv=new DataView(buf),u8=new Uint8Array(buf);
+  if(buf.byteLength<14||String.fromCharCode(u8[8],u8[9],u8[10],u8[11])!=='.FIT')return null;
+  const hs=u8[0],end=Math.min(buf.byteLength,hs+dv.getUint32(4,true)),defs={},laps=[];let p=hs;
+  const INV={1:127,2:255,3:32767,4:65535,5:2147483647,6:4294967295,0:255,13:255};
+  const rd=(o,sz,t,le)=>{let v;
+    switch(t){case 1:v=dv.getInt8(o);break;case 3:v=dv.getInt16(o,le);break;case 4:case 11:v=dv.getUint16(o,le);break;case 5:v=dv.getInt32(o,le);break;case 6:case 12:v=dv.getUint32(o,le);break;case 0:case 2:case 10:case 13:v=dv.getUint8(o);break;default:return null}
+    return INV[t]===v?null:v};
+  try{
+    while(p<end){
+      const h0=u8[p++];
+      if(h0&0x80){const d=defs[(h0>>5)&3];if(!d)return null;p+=d.size;continue}
+      const lt=h0&0x0f;
+      if(h0&0x40){p++;const le=u8[p++]===0,gn=dv.getUint16(p,le);p+=2;const nf=u8[p++],f=[];let size=0;
+        for(let i=0;i<nf;i++){f.push([u8[p],u8[p+1],u8[p+2]&0x1f]);size+=u8[p+1];p+=3}
+        if(h0&0x20){const nd=u8[p++];for(let i=0;i<nd;i++){size+=u8[p+1];p+=3}} // campos de desenvolvedor
+        defs[lt]={gn,le,f,size}}
+      else{const d=defs[lt];if(!d)return null;
+        if(d.gn===19){let o=p;const m={};for(const [n,sz,t] of d.f){if(n===7||n===8||n===9||n===15||n===16||n===24||n===71){const sizes={0:1,1:1,2:1,3:2,4:2,5:4,6:4,10:1,11:2,12:4,13:1};if(sizes[t]===sz)m[n]=rd(o,sz,t,d.le)}o+=sz}
+          laps.push({t:m[8]!=null?m[8]/1000:null,d:m[9]!=null?m[9]/100:null,hr:m[15],hm:m[16],trig:m[24],idx:m[71]})}
+        p+=d.size}
+    }
+  }catch(e){return null}
+  return laps.length?laps:null;
+}
+// junta voltas seguidas do mesmo passo do treino (o aquecimento de 1,5 km vem em duas voltas: 1 km + 0,5 km)
+function mergeLaps(L){
+  const V=L.filter(l=>l.t&&l.d);
+  // corrida livre com voltas automáticas de 1 km (e a última volta encerrada ao parar o relógio): não é treino por etapas
+  if(!V.some(l=>l.idx!=null)&&!V.some((l,i)=>l.trig===0&&l.d>=100&&i<V.length-1))return null;
+  const out=[];
+  V.forEach((l,i)=>{
+    const p=out[out.length-1],ult=i===V.length-1;
+    if(p&&((l.idx!=null&&l.idx===p.idx)||(ult&&l.idx==null&&l.d<100))){
+      if(l.hr!=null)p.hr=p.hr!=null?(p.hr*p.t+l.hr*l.t)/(p.t+l.t):l.hr;
+      p.hm=Math.max(p.hm||0,l.hm||0)||null;p.d+=l.d;p.t+=l.t}
+    else out.push({idx:l.idx,d:l.d,t:l.t,hr:l.hr,hm:l.hm});
+  });
+  return out.length>=2?out.map(e=>({idx:e.idx,d:Math.round(e.d),t:Math.round(e.t*10)/10,hr:e.hr!=null?Math.round(e.hr):null,hm:e.hm})):null;
+}
+async function loadEtapas(id){
+  const x=AX[id];if(!x||!CFG.key)return;
+  try{
+    const r=await fetch(`${API}/activity/${id}/file`,{headers:{Authorization:'Basic '+btoa('API_KEY:'+CFG.key)}});
+    if(r.ok){const L=fitLaps(await r.arrayBuffer());x.etapas=L?mergeLaps(L):null}
+    else x.etapas=null; // sem arquivo (ex.: corrida vinda do Strava)
+    LS.set('ax5',AX);
+  }catch(e){} // sem internet: tenta de novo na próxima vez
+}
+// nomes das etapas: do plano do dia quando o número de etapas confere; senão deduzidos (aquecimento, tiro/recuperação, desaquecimento)
+const nomeCurto=e=>({'Aquecer':'Aquec.','Desaquecer':'Desaq.'}[e.nome]||e.nome)+(e.n?' '+e.r+'/'+e.n:'');
+function nomearEtapas(E,a){
+  const pl=planOn(a.date.slice(0,10)),fl=pl?flatSteps(pl):[];
+  if(fl.length===E.length)return fl;
+  const cnt={};E.forEach(e=>{if(e.idx!=null)cnt[e.idx]=(cnt[e.idx]||0)+1});
+  const rep=Object.keys(cnt).filter(k=>cnt[k]>=2),seq={};let rap=null;
+  if(rep.length===2){const pa=k=>{const s=E.filter(e=>String(e.idx)===k);return s.reduce((x,e)=>x+e.t,0)/s.reduce((x,e)=>x+e.d,0)};rap=pa(rep[0])<pa(rep[1])?rep[0]:rep[1]}
+  return E.map((e,i)=>{
+    if(e.idx==null)return {nome:'Volta '+(i+1)};
+    if(rep.length===2&&cnt[e.idx]>=2){const k=seq[e.idx]=(seq[e.idx]||0)+1;return {nome:String(e.idx)===rap?'Tiro':'Rec.',r:k,n:cnt[e.idx]}}
+    return {nome:i===0?'Aquecer':i===E.length-1?'Desaquecer':'Etapa '+(i+1)};
+  });
+}
+// tempo com uma casa decimal, como o relógio mostra (0:50.9)
+const fmtT1=s=>{if(s==null||!isFinite(s))return '--';const t=Math.round(s*10)/10,m=Math.floor(t/60),x=t-m*60;return m+':'+(x<10?'0':'')+x.toFixed(1)};
+function etapasHtml(E,a){
+  const N=nomearEtapas(E,a);
+  return `<div class="sec">ETAPAS<small>${E.length} ETAPAS · ${fmtT(E.reduce((s,e)=>s+e.t,0))}</small></div><table><tr><th>Etapa</th><th class="r">Dist.</th><th class="r">Tempo</th><th class="r">Ritmo</th><th class="r">FC</th></tr>${E.map((e,i)=>{
+    const n=N[i]||{nome:'Etapa '+(i+1)},pc=e.t/e.d*1000,dentro=n.pace&&pc>=Math.min(...n.pace)-5&&pc<=Math.max(...n.pace)+5;
+    return `<tr><td style="font-family:var(--f)">${esc(nomeCurto(n))}</td><td class="r">${e.d>=1000?kmTxt((e.d/1000).toFixed(2))+' km':e.d+' m'}</td><td class="r">${fmtT1(e.t)}</td><td class="r ${dentro?'ok':''}">${fmtP(pc)}</td><td class="r dim">${e.hr||'--'}</td></tr>`}).join('')}</table>
+  ${nomearEtapas(E,a).some((n,i)=>n.pace)?'<p class="empty" style="margin-top:6px">Ritmo em azul: dentro da meta do treino planejado.</p>':''}`;
+}
+
 /* ================= detalhe da atividade ================= */
 window.openAct=async id=>{
   const a=D.acts.find(x=>x.id===id);if(!a)return;
   if(a.dist&&!AX[id]&&!isMan(a)){openSheet('<p class="empty">Carregando parciais…</p>');try{await loadAX(id);LS.set('ax5',AX)}catch(e){}}
+  if(isRun(a)&&!isMan(a)&&AX[id]&&AX[id].etapas===undefined&&CFG.key){openSheet('<p class="empty">Carregando etapas…</p>');await loadEtapas(id)}
   const x=AX[id]||{},pace=a.dist?a.mov/a.dist*1000:null;
   let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>${x.map?mapBox(id,220):''}
   <div class="grid g3" style="margin-top:10px"><div class="cell"><div class="lbl">Dist.</div><span class="num">${km(a.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(a.mov)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${fmtP(pace)}</span></div><div class="cell"><div class="lbl">FC méd</div><span class="num">${a.hr||'--'}</span></div><div class="cell"><div class="lbl">FC máx</div><span class="num">${a.hrmax||'--'}</span></div><div class="cell"><div class="lbl">Carga</div><span class="num">${Math.round(loadOf(a))}</span></div><div class="cell"><div class="lbl">Altimetria</div><span class="num">${a.elev!=null?Math.round(a.elev)+'<small> m</small>':'--'}</span></div><div class="cell"><div class="lbl">Cadência</div><span class="num">${a.cad?Math.round(a.cad*2):'--'}</span></div><div class="cell"><div class="lbl">Deriva FC</div><span class="num">${x.dec!=null?x.dec+'%':'--'}</span></div></div>`;
   if(x.chart&&x.chart.p.length>3){const P=x.chart.p.map(v=>v&&v<600?v:null),H=x.chart.h,pv=P.filter(Boolean),hv=H.filter(Boolean);const pmn=Math.min(...pv),pmx=Math.max(...pv),hmn=Math.min(...hv),hmx=Math.max(...hv),w=600,hh=110,X=i=>i/(P.length-1)*w;
     const pl=(arr,mn,mx,inv,c)=>`<polyline fill="none" style="stroke:${c}" stroke-width="1.5" points="${arr.map((v,i)=>v==null?'':X(i).toFixed(1)+','+(inv?8+(v-mn)/((mx-mn)||1)*(hh-16):hh-8-(v-mn)/((mx-mn)||1)*(hh-16)).toFixed(1)).filter(Boolean).join(' ')}"/>`;
     h+=`<div class="sec">RITMO × FC</div><svg class="ch" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" style="height:110px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)">${pl(P,pmn,pmx,1,'var(--txt)')}${hv.length?pl(H,hmn,hmx,0,'#e0442f'):''}</svg><div class="row meta" style="gap:14px;margin-top:4px"><span style="color:var(--txt)">━ ritmo (${fmtP(pmn)}–${fmtP(pmx)})</span>${hv.length?`<span style="color:var(--red)">━ FC (${hmn}–${hmx})</span>`:''}</div>`}
-  if(x.splits&&x.splits.length){const fast=Math.min(...x.splits.filter(s=>!s.part).map(s=>s.t));
-    h+=`<div class="sec">PARCIAIS</div><table><tr><th>KM</th><th class="r">Ritmo</th><th class="r">FC</th><th class="r">Elev.</th></tr>${x.splits.map(s=>{const p=s.part?s.t/s.part*1000:s.t;return `<tr><td>${s.part?s.km.toFixed(2):s.km}</td><td class="r ${!s.part&&s.t===fast?'ok':''}">${fmtP(p)}</td><td class="r">${s.hr||'--'}</td><td class="r dim">${s.el!=null?(s.el>0?'+':'')+s.el:''}</td></tr>`}).join('')}</table>`}
+  if(x.etapas&&x.etapas.length>=2)h+=etapasHtml(x.etapas,a);
+  if(x.splits&&x.splits.length){const fast=Math.min(...x.splits.filter(s=>!s.part).map(s=>s.t)),kmT=!!(x.etapas&&x.etapas.length>=2);
+    h+=`${kmT?'<details class="card" style="margin-top:12px"><summary><span>Parciais por km</span></summary>':'<div class="sec">PARCIAIS</div>'}<table><tr><th>KM</th><th class="r">Ritmo</th><th class="r">FC</th><th class="r">Elev.</th></tr>${x.splits.map(s=>{const p=s.part?s.t/s.part*1000:s.t;return `<tr><td>${s.part?s.km.toFixed(2):s.km}</td><td class="r ${!s.part&&s.t===fast?'ok':''}">${fmtP(p)}</td><td class="r">${s.hr||'--'}</td><td class="r dim">${s.el!=null?(s.el>0?'+':'')+s.el:''}</td></tr>`}).join('')}</table>${kmT?'</details>':''}`}
   if(isRun(a))h+=`<div class="coach" style="margin-top:14px"><b>COACH // LEITURA</b>${esc(coachLast(a))}</div>`;
   if(a.gpx&&isMan(a))h+=`<div class="card alert" style="margin-top:12px"><div class="lbl bad">AINDA NÃO ESTÁ NO INTERVALS</div><p class="empty" style="margin-top:4px">Esta corrida foi gravada no celular, mas o envio falhou. Ela já conta aqui no app.</p><button class="b pri full" style="margin-top:8px" onclick="resendGpx('${a.id}')">Enviar ao Intervals</button></div>`;
   openSheet(h);
