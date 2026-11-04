@@ -917,7 +917,7 @@ function rMais(){
   <table style="margin-top:10px"><tr><th>Zona</th><th class="r">FC</th></tr>${z.map((v,i)=>`<tr><td style="font-family:var(--f)">${zn[i]}</td><td class="r">${i?z[i-1]+1:0}–${v}</td></tr>`).join('')}</table>
   <p class="empty" style="margin-top:8px">As zonas vêm do Intervals.icu. Para mudar, edite lá (Configurações → Corrida) e sincronize.</p></div>`;
   h+=`<div class="sec">CONEXÃO</div><details class="card" ${CFG.key?'':'open'}><summary><span>Intervals.icu</span>${CFG.key?'<span class="tag ok">CONECTADO</span>':'<span class="tag bad">SEM CHAVE</span>'}</summary>${connForm('saveConn()','Salvar e sincronizar')}</details>
-  <div class="sec">SOBRE</div><div class="card"><p class="empty">Coach: por enquanto a leitura e os ajustes são calculados no próprio app (carga pela FC, forma, fadiga, VDOT, deriva cardíaca). A conexão com o Claude pela API da Anthropic entra na próxima fase, por um servidor próprio, para a chave não ficar no celular.</p></div>`;
+  <div class="sec">SOBRE</div><div class="card"><p class="empty">Coach: por enquanto a leitura e os ajustes são calculados no próprio app (carga pela FC, forma, fadiga, VDOT, deriva cardíaca). A conexão com o Claude pela API da Anthropic entra na próxima fase, por um servidor próprio, para a chave não ficar no celular.</p><p class="empty" style="margin-top:8px"><a href="privacidade.html" target="_blank" rel="noopener" style="color:var(--blue)">Política de privacidade</a></p></div>`;
   $('#mais').innerHTML=h;
   if($('#c-go'))connStatus();
 }
@@ -1367,7 +1367,7 @@ window.openCompCfg=first=>{
   const on=LS.get('comp',null)==='sim';
   openSheet(`<div class="hd"><b>${first?'BEM-VINDO AO MAPA':'SEU PERFIL NO RANKING'}</b><button class="b sm" onclick="closeSheet()">✕</button></div>
   <p class="empty" style="color:var(--txt)">Aqui estão os melhores lugares para correr na cidade e as marcas de todo mundo que usa o Boonie Run em cada um deles. Ninguém precisa adicionar ninguém.</p>
-  <p class="empty" style="margin-top:8px">Para entrar no ranking, o app publica o resumo das suas corridas: data, distância, tempos e o trajeto sem os primeiros e os últimos 200 m, para não mostrar onde você mora. A sua chave do Intervals só é usada para provar que as corridas são suas e não fica guardada.</p>
+  <p class="empty" style="margin-top:8px">Para entrar no ranking, o app publica o resumo das suas corridas: data, distância, tempos e o trajeto sem os primeiros e os últimos 200 m, para não mostrar onde você mora. A sua chave do Intervals só é usada para provar que as corridas são suas e não fica guardada. <a href="privacidade.html" target="_blank" rel="noopener" style="color:var(--blue)">Política de privacidade</a>.</p>
   ${first?'':`<div class="card ${on?'cur':''}" style="margin-top:10px"><div class="row" style="justify-content:space-between"><span class="lbl" style="color:var(--txt)">Situação</span><span class="tag ${on?'ok':''}">${on?'NO RANKING':'SÓ OLHANDO'}</span></div></div>`}
   <div class="grid g2" style="margin-top:12px">${on?`<button class="b red" onclick="compSet('nao')">Sair do ranking</button><button class="b" onclick="compSet('sim',1)">Atualizar marcas</button>`:`<button class="b pri" onclick="compSet('sim')">Entrar no ranking</button><button class="b" onclick="compSet('nao')">Só olhar</button>`}</div>`);
 };

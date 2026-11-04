@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#000000">
+<title>Política de privacidade · Boonie Run</title>
+<style>
+:root{--bg:#000;--txt:#f2f4ee;--dim:#8a929e;--line:#252a31;--blue:#4a9eff;--amber:#c9a24a;--panel:#0d0d0d}
+@media (prefers-color-scheme:light){:root{--bg:#e6ecf1;--txt:#1d2733;--dim:#5b6876;--line:#c7d1da;--blue:#1f74d6;--amber:#9a6a0c;--panel:#f2f5f8}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--txt);font:16px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Roboto,Arial,sans-serif;padding:24px 18px 60px}
+main{max-width:680px;margin:0 auto}
+a{color:var(--blue)}
+h1{font-size:24px;line-height:1.25;margin:6px 0 4px}
+h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:28px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+p,li{color:var(--txt)}p{margin-bottom:10px}
+ul{padding-left:20px;margin-bottom:10px}li{margin-bottom:6px}
+.dim{color:var(--dim);font-size:14px}
+.box{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:12px 14px;margin:12px 0}
+</style>
+</head>
+<body>
+<main>
+<p><a href="./">← Voltar ao Boonie Run</a></p>
+<h1>Política de privacidade</h1>
+<p class="dim">Boonie Run · atualizada em 4 de novembro de 2026</p>
+
+<h2>Quem somos</h2>
+<p>O Boonie Run é um aplicativo gratuito de treino de corrida, mantido pelo Igor (igordejesusp no GitHub), em Uberlândia (MG). Ele monta planos de treino, mostra a análise das suas corridas e tem um mapa dos lugares para correr na cidade.</p>
+
+<h2>O que o app lê e guarda no seu aparelho</h2>
+<ul>
+<li>As suas corridas, o sono, a frequência cardíaca de repouso e as suas configurações do <b>Intervals.icu</b>, lidos com o seu ID e a sua chave de API (ou, no futuro, pela autorização do próprio Intervals).</li>
+<li>O seu plano, as suas metas, a sua foto de perfil escolhida no app e as corridas que você grava pelo celular.</li>
+<li>Tudo isso fica <b>no navegador do seu aparelho</b>. A sua chave de API não sai do aparelho, a não ser no momento de entrar no ranking (veja abaixo).</li>
+</ul>
+
+<h2>Localização</h2>
+<p>O app usa o GPS do celular quando você grava uma corrida e quando toca no botão de localização do mapa. A sua posição não é enviada ao nosso servidor. Para dar nome aos locais, o app envia a posição aproximada do centro de cada local ao serviço Nominatim, do OpenStreetMap, e o mapa pede ao OpenFreeMap as imagens da área que você está vendo.</p>
+
+<h2>Ranking público (só se você escolher entrar)</h2>
+<p>Na aba Mapa, você escolhe entre <b>Entrar no ranking</b> e <b>Só olhar</b>. Só quem entra tem dados publicados.</p>
+<div class="box">
+<p>Quem entra publica, no servidor do app (Cloudflare):</p>
+<ul>
+<li>o ID, o nome e a foto do perfil no Intervals, e o sexo cadastrado;</li>
+<li>de cada corrida com GPS: a data, a distância, o tempo, os melhores tempos de 1, 3, 5, 10 e 21 km e o trajeto simplificado, <b>sem os primeiros e os últimos 200 m</b>, para não mostrar onde você mora.</li>
+</ul>
+</div>
+<p>Essas informações aparecem para todos que usam o app. A sua chave de API é enviada ao nosso servidor apenas para confirmar no Intervals que as corridas são suas, e <b>não é gravada</b>.</p>
+
+<h2>Como sair e apagar</h2>
+<ul>
+<li><b>Sair do ranking:</b> na aba Mapa, toque no botão do canto e escolha <i>Sair do ranking</i>. Os seus dados são apagados do servidor na hora.</li>
+<li><b>Apagar os dados do aparelho:</b> limpe os dados do site nas configurações do navegador, ou remova o app da tela de início.</li>
+<li><b>Revogar a chave:</b> no Intervals, você pode trocar a chave de API quando quiser.</li>
+</ul>
+
+<h2>Com quem os dados passam</h2>
+<ul>
+<li><b>Intervals.icu</b>: de onde vêm as suas corridas, e para onde vão os treinos que você manda.</li>
+<li><b>Cloudflare</b>: hospeda o servidor do ranking.</li>
+<li><b>GitHub</b>: hospeda o app.</li>
+<li><b>OpenStreetMap e OpenFreeMap</b>: mapas e nomes de locais.</li>
+</ul>
+<p>Não vendemos dados e não usamos os seus dados para anúncios.</p>
+
+<h2>Seus direitos</h2>
+<p>Conforme a Lei Geral de Proteção de Dados (LGPD), você pode pedir acesso, correção ou exclusão dos seus dados. Para pedir, abra um chamado em <a href="https://github.com/igordejesusp/boonie-run/issues" rel="noopener">github.com/igordejesusp/boonie-run/issues</a>, sem colocar a sua chave de API.</p>
+
+<h2>Mudanças</h2>
+<p>Se esta política mudar, a data no topo é atualizada.</p>
+</main>
+</body>
+</html>
