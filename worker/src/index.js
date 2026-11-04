@@ -1,8 +1,10 @@
 // Servidor do Competitivo do Boonie Run (Cloudflare Worker + KV).
 // Cada app publica o resumo das próprias corridas; qualquer app lê o de todos.
+// Amigos: pedido por ID do Intervals, que só vale depois que o outro aceita (guardado em 'f:<id>').
 // A chave do Intervals só serve para provar que o atleta é quem diz ser: é conferida no Intervals e descartada, nunca é gravada.
 
 const ORIGENS = ['https://igordejesusp.github.io', 'http://localhost:8768'];
+const MAXPED = 100; // pedidos pendentes por pessoa
 const LIMITE = 400_000; // tamanho máximo do resumo de um atleta (bytes)
 
 const cors = (req) => {
@@ -40,6 +42,49 @@ async function todos(env) {
   return out;
 }
 
+
+// ---------- amigos ----------
+const vazio = () => ({ friends: [], inc: [], out: [] });
+const lerF = async (env, id) => ({ ...vazio(), ...((await env.BR.get('f:' + id, 'json')) || {}) });
+const gravaF = (env, id, f) => env.BR.put('f:' + id, JSON.stringify(f));
+const sem = (l, x) => l.filter((y) => y !== x);
+const com = (l, x) => (l.includes(x) ? l : [...l, x]);
+
+async function amigos(env, eu, acao, alvo) {
+  const me = await lerF(env, eu);
+  let aviso = '';
+  if (acao !== 'lista') {
+    if (!/^i\d{1,12}$/.test(alvo || '') || alvo === eu) return { erro: 'ID inválido' };
+    const ou = await lerF(env, alvo);
+    if (acao === 'pedir') {
+      if (me.friends.includes(alvo)) aviso = 'ja';
+      else if (me.inc.includes(alvo)) { // o outro já tinha pedido: vira amizade
+        me.inc = sem(me.inc, alvo); ou.out = sem(ou.out, eu);
+        me.friends = com(me.friends, alvo); ou.friends = com(ou.friends, eu); aviso = 'aceito';
+      } else if (ou.inc.length >= MAXPED && !ou.inc.includes(eu)) aviso = 'cheio';
+      else { me.out = com(me.out, alvo); ou.inc = com(ou.inc, eu); aviso = 'enviado'; }
+    } else if (acao === 'aceitar') {
+      if (me.inc.includes(alvo)) {
+        me.inc = sem(me.inc, alvo); ou.out = sem(ou.out, eu);
+        me.friends = com(me.friends, alvo); ou.friends = com(ou.friends, eu); aviso = 'aceito';
+      }
+    } else if (acao === 'recusar') {
+      me.inc = sem(me.inc, alvo); ou.out = sem(ou.out, eu);
+    } else if (acao === 'remover') { // também cancela pedido enviado
+      me.friends = sem(me.friends, alvo); ou.friends = sem(ou.friends, eu);
+      me.out = sem(me.out, alvo); ou.inc = sem(ou.inc, eu);
+    } else return { erro: 'ação inválida' };
+    await Promise.all([gravaF(env, eu, me), gravaF(env, alvo, ou)]);
+  }
+  // nome e foto de quem já publicou, para o app mostrar os pedidos
+  const pessoas = {};
+  for (const id of new Set([...me.friends, ...me.inc, ...me.out])) {
+    const r = await env.BR.get('a:' + id, 'json');
+    if (r) pessoas[id] = { name: r.name, pic: r.pic };
+  }
+  return { ...me, pessoas, aviso, conhecido: acao === 'pedir' ? !!(await env.BR.get('a:' + alvo)) : undefined };
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -67,6 +112,15 @@ export default {
       return json(req, { ok: true, runs: runs.length });
     }
 
-    return json(req, { app: 'Boonie Run', rotas: ['GET /all', 'POST /publish', 'DELETE /me'] });
+    if (req.method === 'POST' && url.pathname === '/amigos') {
+      let b;
+      try { b = JSON.parse(await req.text()); } catch (e) { return json(req, { erro: 'json inválido' }, 400); }
+      const a = await confere(b.athlete, b.key);
+      if (!a) return json(req, { erro: 'chave não confere com o atleta' }, 403);
+      const r = await amigos(env, b.athlete, b.acao || 'lista', b.alvo);
+      return json(req, r, r.erro ? 400 : 200);
+    }
+
+    return json(req, { app: 'Boonie Run', rotas: ['GET /all', 'POST /publish', 'DELETE /me', 'POST /amigos'] });
   },
 };

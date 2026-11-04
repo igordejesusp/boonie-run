@@ -165,6 +165,7 @@ svg.ch{width:100%;display:block}
 .rbtn{width:80px;height:80px;border-radius:50%;border:2px solid var(--blue);background:var(--sel);color:var(--blue);font-size:11px;letter-spacing:.1em;font-weight:600;padding:0}.rbtn.red{border-color:var(--red);background:var(--redbg);color:var(--bad)}.rbtn.amb{border-color:var(--amber);background:var(--ambbg);color:var(--amber)}
 #v-comp{padding:0;overflow:hidden}#comp{max-width:none;height:100%;position:relative}#cmap{position:absolute;inset:0;background:var(--bg)}
 .cbar{position:absolute;z-index:3;top:10px;left:10px;right:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none}.cbar .cr{display:flex;justify-content:space-between;align-items:center;gap:6px;pointer-events:none}.cbar .cr>*{pointer-events:auto}.cbar .seg{background:var(--glass)}
+.bd{display:inline-block;min-width:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:var(--blue);color:#000;font-size:10px;line-height:16px;text-align:center}
 .pin{width:40px;height:40px;border-radius:50%;border:3px solid var(--blue);padding:0;background:var(--bg);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.45);cursor:pointer}.pin img{width:100%;height:100%;object-fit:cover;display:block}
 .chip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:18px;background:var(--glass);border:1px solid var(--line);color:var(--txt);font-size:10px;letter-spacing:.1em;white-space:nowrap}.chip.b{color:var(--blue);border-color:var(--blue);min-width:0}
 .fab{position:absolute;z-index:3;right:12px;bottom:40px;width:50px;height:50px;border-radius:50%;background:var(--glass);border:1px solid var(--blue);color:var(--blue);font-size:22px;line-height:1;padding:0}
@@ -1480,7 +1481,6 @@ window.bOrig=()=>{const ex=LS.get('extra',{});delete ex[BD.orig];LS.set('extra',
 // os outros atletas vêm do servidor público (PUBURL); ninguém precisa adicionar ninguém
 let CM=null,CP={i:0,d:0},PLC=[];
 const MODO=()=>LS.get('mmode','g'); // 'a' = só amigos, 'g' = geral
-const AMG=()=>LS.get('amigos',[]);
 const CDIST=[[1000,'1 KM'],[3000,'3 KM'],[5000,'5 KM'],[10000,'10 KM'],[21097.5,'21 KM']];
 const myPic=()=>LS.get('foto',null)||(D.athlete||{}).pic||'logo.png';
 const dM=(p,q)=>Math.hypot((p[0]-q[0])*111320,(p[1]-q[1])*111320*Math.cos(p[0]*Math.PI/180));
@@ -1489,7 +1489,7 @@ function bestsOf(a,b0){const b={...(b0||{})};for(const [d] of CDIST)if(a.dist>=d
 function people(){
   const me={id:CFG.athlete,name:((D.athlete||{}).name||'Você'),pic:myPic(),me:1,
     runs:D.acts.filter(a=>isRun(a)&&AX[a.id]&&AX[a.id].map).map(a=>({id:a.id,date:a.date,dist:a.dist,mov:a.mov,best:bestsOf(a,AX[a.id].best),map:AX[a.id].map}))};
-  return [me,...PUBL.filter(u=>u.id!==CFG.athlete&&u.runs&&u.runs.length&&(MODO()==='g'||AMG().includes(u.id))).map(u=>({id:u.id,name:u.name||u.id,pic:u.pic||'logo.png',runs:u.runs}))];
+  return [me,...PUBL.filter(u=>u.id!==CFG.athlete&&u.runs&&u.runs.length&&(MODO()==='g'||FR.friends.includes(u.id))).map(u=>({id:u.id,name:u.name||u.id,pic:u.pic||'logo.png',runs:u.runs}))];
 }
 function buildPlaces(P){
   const L=[];
@@ -1571,6 +1571,7 @@ function rComp(){
   const el=$('#comp'),M=MODO();
   if(!$('#cmap'))el.innerHTML=`<div id="cmap"></div><div class="cbar"><div class="cr"><div class="seg" id="c-seg"><button data-m="a" onclick="setModo('a')">AMIGOS</button><button data-m="g" onclick="setModo('g')">GERAL</button></div><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="chip b" onclick="openRank()">RANKING</button><button class="chip b" id="c-me" onclick="openCompCfg()">EU</button></span></div><div class="cr"><span class="chip" id="c-info">CARREGANDO…</span><button class="chip b" id="c-add" onclick="openAmigos()">+ AMIGOS</button></div></div><button class="fab" onclick="locateMe(1)" aria-label="Onde estou">◎</button>`;
   document.querySelectorAll('#c-seg button').forEach(b=>b.classList.toggle('on',b.dataset.m===M));
+  document.querySelector('#c-seg button[data-m=a]').innerHTML='AMIGOS'+(FR.inc.length?` <span class="bd">${FR.inc.length}</span>`:'');
   $('#c-add').style.display=M==='a'?'':'none';
   const {P,lines}=compData(),nl=`${PLC.length} ${PLC.length===1?'LOCAL':'LOCAIS'}`;
   $('#c-info').textContent=M==='a'?(P.length>1?`${P.length-1} ${P.length===2?'AMIGO':'AMIGOS'} · ${nl}`:`${nl} · ADICIONE AMIGOS`):`${nl} · ${P.length} ${P.length===1?'ATLETA':'ATLETAS'}`;
@@ -1591,7 +1592,7 @@ function rComp(){
   }).catch(()=>{$('#c-info').textContent='MAPA INDISPONÍVEL SEM INTERNET'});
   $('#c-me').textContent=LS.get('comp',null)==='sim'?'NO RANKING':'SÓ OLHANDO';
   if(LS.get('comp',null)==null&&!$('#sheet').classList.contains('on'))openCompCfg(1);
-  if(Date.now()-LS.get('pubAt',0)>120e3){LS.set('pubAt',Date.now());Promise.all([publishMine().catch(()=>{}),pullAll()]).then(()=>VIEW==='comp'&&rComp()).catch(()=>{})}
+  if(Date.now()-LS.get('pubAt',0)>120e3){LS.set('pubAt',Date.now());Promise.all([publishMine().catch(()=>{}),pullAll(),frCall('lista').catch(()=>{})]).then(()=>VIEW==='comp'&&rComp()).catch(()=>{})}
 }
 // ao abrir, o mapa já vem perto e centrado em você (init); o botão ◎ voltar para você (fly)
 window.locateMe=(fly,init)=>{
@@ -1601,18 +1602,67 @@ window.locateMe=(fly,init)=>{
     if(init&&CM)CM.jumpTo({center:c,zoom:14.5});else if(fly&&CM)CM.flyTo({center:c,zoom:14.5})},
     ()=>{if(init)fitPlaces();else fly&&toast(locMsg(),3500)},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
 };
-// lista de pessoas que entraram no ranking, para seguir como amigo
-window.openAmigos=()=>{
-  const A=AMG(),L=PUBL.filter(u=>u.id!==CFG.athlete&&u.runs&&u.runs.length).sort((a,b)=>(A.includes(b.id)-A.includes(a.id))||String(a.name).localeCompare(String(b.name)));
+// amigos: o pedido vai pelo ID do Intervals e só vale depois que o outro aceita (o servidor guarda a lista)
+let FR=LS.get('frs',{friends:[],inc:[],out:[],pessoas:{}});
+async function frCall(acao,alvo){
+  if(!CFG.key||!CFG.athlete)throw new Error('sem conexão com o Intervals');
+  const r=await fetch(PUBURL+'/amigos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({athlete:CFG.athlete,key:CFG.key,acao,alvo})});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.erro||('HTTP '+r.status));
+  FR={friends:j.friends||[],inc:j.inc||[],out:j.out||[],pessoas:j.pessoas||{}};LS.set('frs',FR);return j;
+}
+const frNome=id=>{const u=PUBL.find(x=>x.id===id);return (u&&u.name)||(FR.pessoas[id]||{}).name||id};
+const frPic=id=>{const u=PUBL.find(x=>x.id===id);return (u&&u.pic)||(FR.pessoas[id]||{}).pic||'logo.png'};
+window.openAmigos=nofetch=>{
+  const row=(id,mid,btns)=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2)">${avatar({pic:frPic(id)},34)}<span style="flex:1;min-width:0" ${mid}><b style="display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(frNome(id))}</b><span class="meta">${frNome(id)===id?'ainda não abriu o Mapa':esc(id)}</span></span>${btns}</div>`;
+  const sec=(t,l)=>l.length?`<div class="sec">${t}</div><div class="card" style="padding:4px 12px">${l.join('')}</div>`:'';
   openSheet(`<div class="hd"><b>AMIGOS</b><button class="b sm" onclick="closeSheet()">✕</button></div>
-  <p class="empty">Só aparecem aqui as pessoas que entraram no ranking. Quem você seguir aparece no mapa dos amigos, com as marcas e os locais.</p>
-  ${L.length?`<input type="search" id="am-q" placeholder="Buscar pelo nome" autocomplete="off" oninput="amBusca(this.value)" style="margin-top:10px">
-  <div class="card" style="padding:4px 12px;margin-top:10px">${L.map(u=>`<div class="row am" data-n="${esc(String(u.name||'').toLowerCase())}" style="flex-wrap:nowrap;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2)">${avatar({pic:u.pic||'logo.png'},34)}<span style="flex:1;min-width:0"><b style="display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.name||u.id)}</b><span class="meta">${u.runs.length} ${u.runs.length===1?'corrida':'corridas'}</span></span><button class="b sm ${A.includes(u.id)?'pri':''}" data-id="${esc(u.id)}" onclick="togAmigo(this)">${A.includes(u.id)?'SEGUINDO':'SEGUIR'}</button></div>`).join('')}</div>`
-  :`<p class="empty" style="margin-top:12px;color:var(--txt)">Ninguém além de você entrou no ranking ainda. Peça para os seus amigos abrirem a aba Mapa no app e tocarem em "Entrar no ranking".</p>`}`);
+  <p class="empty">Peça o ID do Intervals do seu amigo e envie o pedido. Ele aceita no Mapa dele, e só quem aceitou aparece no mapa dos amigos.</p>
+  <div class="card" style="margin-top:10px"><div class="lbl">SEU ID</div><div class="row" style="justify-content:space-between;margin-top:4px"><span class="num" style="font-size:18px">${esc(CFG.athlete||'')}</span><button class="b sm" onclick="copiaId()">COPIAR</button></div><div class="meta">Passe este ID para o seu amigo poder te adicionar.</div></div>
+  <div class="row" style="gap:8px;margin-top:12px;flex-wrap:nowrap"><input id="am-id" placeholder="ID do amigo (ex.: i123456)" autocomplete="off" autocapitalize="off" autocorrect="off" style="flex:1;min-width:0"><button class="b pri" onclick="frAdd()">ADICIONAR</button></div>
+  ${sec('PEDIDOS RECEBIDOS',FR.inc.map(id=>row(id,'',`<button class="b sm pri" onclick="frAcao('aceitar','${esc(id)}')">ACEITAR</button><button class="b sm" onclick="frAcao('recusar','${esc(id)}')">RECUSAR</button>`)))}
+  ${sec('MEUS AMIGOS',FR.friends.map(id=>row(id,`onclick="openPerfilAmigo('${esc(id)}')"`,`<button class="b sm" onclick="openPerfilAmigo('${esc(id)}')">PERFIL</button>`)))}
+  ${sec('PEDIDOS ENVIADOS',FR.out.map(id=>row(id,'',`<span class="meta">AGUARDANDO</span><button class="b sm" onclick="frAcao('remover','${esc(id)}')">CANCELAR</button>`)))}
+  ${FR.friends.length+FR.inc.length+FR.out.length?'':'<p class="empty" style="margin-top:12px">Você ainda não tem amigos adicionados.</p>'}`);
+  if(!nofetch)frCall('lista').then(()=>{const i=$('#am-id');if(i&&!i.value)openAmigos(1);if(VIEW==='comp')rComp()}).catch(()=>{});
 };
-window.amBusca=q=>{q=q.trim().toLowerCase();document.querySelectorAll('#sbox .am').forEach(r=>r.style.display=r.dataset.n.includes(q)?'':'none')};
-window.togAmigo=b=>{const id=b.dataset.id;let A=AMG();const on=A.includes(id);A=on?A.filter(x=>x!==id):[...A,id];LS.set('amigos',A);
-  b.textContent=on?'SEGUIR':'SEGUINDO';b.classList.toggle('pri',!on);rComp()};
+window.copiaId=()=>{try{navigator.clipboard.writeText(CFG.athlete).then(()=>toast('ID COPIADO')).catch(()=>toast(CFG.athlete,4000))}catch(e){toast(CFG.athlete,4000)}};
+window.frAdd=async()=>{
+  let v=($('#am-id').value||'').trim().toLowerCase().replace(/\s/g,'');if(/^\d{3,12}$/.test(v))v='i'+v;
+  if(!/^i\d{3,12}$/.test(v))return toast('ID INVÁLIDO. EXEMPLO: i123456',3200);
+  if(v===CFG.athlete)return toast('ESSE É O SEU PRÓPRIO ID');
+  try{const j=await frCall('pedir',v);
+    toast(j.aviso==='aceito'?'VOCÊS JÁ SÃO AMIGOS':j.aviso==='ja'?'VOCÊS JÁ SÃO AMIGOS':j.aviso==='cheio'?'ESSA PESSOA TEM PEDIDOS DEMAIS':j.conhecido?'PEDIDO ENVIADO':'PEDIDO ENVIADO. ESSE ID AINDA NÃO ABRIU O MAPA, CONFIRA SE ESTÁ CERTO',j.conhecido?2400:4500)}
+  catch(e){toast('NÃO FOI POSSÍVEL ENVIAR // '+e.message,3500)}
+  openAmigos(1);rComp();
+};
+window.frAcao=async(acao,id)=>{
+  if(acao==='remover'&&FR.friends.includes(id)&&!confirm('Remover '+frNome(id)+' dos seus amigos?'))return;
+  try{await frCall(acao,id);toast(acao==='aceitar'?'AMIGO ADICIONADO':acao==='recusar'?'PEDIDO RECUSADO':FR.friends.includes(id)?'':'REMOVIDO')}
+  catch(e){toast('SEM CONEXÃO COM O SERVIDOR // '+e.message,3500)}
+  openAmigos(1);rComp();
+};
+// perfil do amigo, montado com o que ele publicou (corridas com GPS)
+window.openPerfilAmigo=id=>{
+  const u=PUBL.find(x=>x.id===id),runs=(u&&u.runs)||[],n=new Date(),ini=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-01',
+    ds=r=>String(r.date).slice(0,10),tot=runs.reduce((t,r)=>t+(r.dist||0),0),mes=runs.filter(r=>ds(r)>=ini),kmM=mes.reduce((t,r)=>t+(r.dist||0),0),
+    maxd=Math.max(0,...runs.map(r=>r.dist||0)),eAmigo=FR.friends.includes(id);
+  const rec=CDIST.map(([d,nm])=>{let b=null;for(const r of runs){const t=r.best&&r.best[d];if(t&&(!b||t<b.t))b={t,date:ds(r)}}return [d,nm,b]}).filter(x=>x[2]);
+  const med=[];if(maxd>=5000)med.push('5 km numa corrida');if(maxd>=10000)med.push('10 km numa corrida');if(maxd>=21097)med.push('Meia maratona');
+  if(runs.length>=10)med.push('10 corridas');if(runs.length>=50)med.push('50 corridas');if(tot>=100000)med.push('100 km somados');if(tot>=500000)med.push('500 km somados');
+  const lid=PLC.filter(p=>p.dono&&p.dono.id===id),ult=[...runs].sort((a,b)=>ds(b).localeCompare(ds(a))).slice(0,5),dd=x=>fmtD(x)+'/'+x.slice(2,4);
+  openSheet(`<div class="hd"><b>PERFIL DO AMIGO</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <div class="row" style="flex-wrap:nowrap;gap:12px;margin:4px 0 12px">${avatar({pic:frPic(id)},56)}<span><b style="display:block;font-size:17px">${esc(frNome(id))}</b><span class="meta">${esc(id)}${eAmigo?' · AMIGO':''}</span></span></div>
+  ${u&&runs.length?`<div class="grid g3"><div class="cell"><div class="lbl">Este mês</div><span class="num">${km(kmM)}<small> km</small></span><div class="meta">${mes.length} ${mes.length===1?'corrida':'corridas'}</div></div>
+  <div class="cell"><div class="lbl">Total no app</div><span class="num">${km(tot)}<small> km</small></span><div class="meta">${runs.length} corridas</div></div>
+  <div class="cell"><div class="lbl">Locais 👑</div><span class="num">${lid.length}</span><div class="meta">que lidera</div></div></div>
+  ${med.length?`<div class="sec">CONQUISTAS</div><div class="row" style="gap:6px">${med.map(m=>`<span class="tag ok">🏅 ${m}</span>`).join('')}</div>`:''}
+  ${rec.length?`<div class="sec">MELHORES MARCAS</div><div class="card" style="padding:4px 12px">${rec.map(([d,nm,b])=>`<div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line2)"><span class="lbl" style="color:var(--txt)">${nm}</span><span><span class="num">${fmtT(b.t)}</span> <span class="meta">${fmtP(b.t/d*1000)}/km · ${dd(b.date)}</span></span></div>`).join('')}</div>`:''}
+  ${lid.length?`<div class="sec">LOCAIS QUE LIDERA</div><div class="card" style="padding:4px 12px">${lid.slice(0,6).map(p=>`<div class="row tap" style="justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line2)" onclick="openPlace(${p.i})"><span>${esc(PN[p.key]||'Local '+(p.i+1))}</span><span class="meta">${CDIST.find(([x])=>x===p.ref)?CDIST.find(([x])=>x===p.ref)[1]:''} ›</span></div>`).join('')}</div>`:''}
+  <div class="sec">ÚLTIMOS TREINOS</div><div class="card" style="padding:4px 12px">${ult.map(r=>`<div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line2)"><span class="meta">${dd(ds(r))}</span><span class="num">${km(r.dist)}<small> km</small></span><span class="meta">${r.mov&&r.dist?fmtP(r.mov/r.dist*1000)+'/km':''} · ${fmtT(r.mov)}</span></div>`).join('')}</div>
+  <p class="meta" style="margin-top:8px">Só aparece o que a pessoa publicou no ranking: as corridas com GPS mais recentes.</p>`
+  :`<p class="empty" style="color:var(--txt)">${esc(frNome(id))} ainda não entrou no ranking, então o app não tem as corridas dessa pessoa. Quando ela entrar, o perfil aparece aqui sozinho.</p>`}
+  <div class="grid g2" style="margin-top:14px"><button class="b" onclick="openAmigos(1)">◀ Voltar</button>${eAmigo?`<button class="b red" onclick="frAcao('remover','${esc(id)}')">Remover amigo</button>`:'<span></span>'}</div>`);
+};
 const medal=i=>['🥇','🥈','🥉'][i]||(i+1)+'º';
 const avatar=(u,s=30)=>`<img src="${esc(u.pic)}" alt="" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:1px solid ${u.me?'var(--blue)':'var(--line)'};flex:none">`;
 window.openPlace=(i,d)=>{
@@ -1624,7 +1674,7 @@ window.openPlace=(i,d)=>{
   <div class="meta">${pl.runs.length} corridas · ${pl.users} ${pl.users===1?'atleta':'atletas'} · ${km(pl.km*1000)} km no total</div>`;
   if(pl.dists.length){
     h+=`<div class="seg" style="margin:12px 0 10px">${pl.dists.map(([x,n])=>`<button class="${CP.d===x?'on':''}" onclick="openPlace(${i},${x})">${n}</button>`).join('')}</div>
-    <div class="card" style="padding:4px 12px">${B.map((x,j)=>[x,j]).filter(([x,j])=>j<5||x.u.me).map(([x,j])=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2)" onclick="${x.u.me?`openAct('${x.id}')`:''}"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u)}<span style="flex:1;min-width:0"><b style="display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">${fmtD(x.date)}/${x.date.slice(2,4)}</span></span><span style="text-align:right"><span class="num" style="display:block">${fmtT(x.t)}</span><span class="meta">${fmtP(x.t/CP.d*1000)}/km</span></span></div>`).join('')}</div>
+    <div class="card" style="padding:4px 12px">${B.map((x,j)=>[x,j]).filter(([x,j])=>j<5||x.u.me).map(([x,j])=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2)" onclick="${x.u.me?`openAct('${x.id}')`:MODO()==='a'?`openPerfilAmigo('${esc(x.u.id)}')`:''}"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u)}<span style="flex:1;min-width:0"><b style="display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">${fmtD(x.date)}/${x.date.slice(2,4)}</span></span><span style="text-align:right"><span class="num" style="display:block">${fmtT(x.t)}</span><span class="meta">${fmtP(x.t/CP.d*1000)}/km</span></span></div>`).join('')}</div>
     ${meI>0?`<div class="card cur"><div class="lbl" style="color:var(--blue)">SUA MARCA</div><p class="empty" style="margin-top:4px;color:var(--txt)">Você está em ${meI+1}º. Faltam <b style="color:var(--hi)">${fmtT(B[meI].t-B[0].t)}</b> para tomar o 1º lugar de ${esc(B[0].u.name.split(' ')[0])} (ritmo de ${fmtP(B[0].t/CP.d*1000)}/km).</p></div>`:meI===0?`<div class="card cur"><div class="lbl" style="color:var(--blue)">👑 O LOCAL É SEU</div><p class="empty" style="margin-top:4px;color:var(--txt)">Você tem o melhor tempo de ${CDIST.find(([x])=>x===CP.d)[1].toLowerCase()} aqui.${B[1]?` ${esc(B[1].u.name.split(' ')[0])} está ${fmtT(B[1].t-B[0].t)} atrás.`:' Chame os amigos para disputar.'}</p></div>`:CP.d?`<p class="empty" style="margin:8px 0">Você ainda não tem marca nessa distância aqui.</p>`:''}`;
   }else h+=`<p class="empty" style="margin:12px 0">Nenhuma corrida com 1 km completo neste local ainda.</p>`;
   h+=`<div class="sec">LENDA DO LOCAL<small>MAIS CORRIDAS AQUI</small></div><div class="card" style="padding:4px 12px">${L.slice(0,5).map((x,j)=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:8px 0;border-bottom:1px solid var(--line2)"><span class="num" style="width:28px;text-align:center">${j?j+1+'º':'⭐'}</span>${avatar(x.u,26)}<span style="flex:1;font-size:13px">${esc(x.u.name)}</span><span class="num" style="font-size:13px">${x.n}<small class="dim"> ${x.n===1?'corrida':'corridas'}</small></span></div>`).join('')}</div>`;
@@ -1632,7 +1682,7 @@ window.openPlace=(i,d)=>{
   if(!PN[pl.key])placeName(pl).then(n=>{const e=$('#pl-nm');if(e&&CP.i===i)e.textContent=n});
 };
 window.openRank=()=>{
-  const {L,mes,dias}=ranking(),M=MODO(),meI=L.findIndex(x=>x.u.me),row=(x,j)=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:10px 0;border-bottom:1px solid var(--line2)"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u,34)}<span style="flex:1;min-width:0"><b style="display:block;font-size:14px;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">${km(x.km*1000)} km · 👑 ${x.coroas}</span></span><span class="num" style="font-size:18px">${x.pts}<small class="dim"> pts</small></span></div>`;
+  const {L,mes,dias}=ranking(),M=MODO(),meI=L.findIndex(x=>x.u.me),row=(x,j)=>`<div class="row" ${!x.u.me&&M==='a'?`onclick="openPerfilAmigo('${esc(x.u.id)}')" `:''}style="flex-wrap:nowrap;gap:10px;padding:10px 0;border-bottom:1px solid var(--line2)"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u,34)}<span style="flex:1;min-width:0"><b style="display:block;font-size:14px;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">${km(x.km*1000)} km · 👑 ${x.coroas}</span></span><span class="num" style="font-size:18px">${x.pts}<small class="dim"> pts</small></span></div>`;
   const vis=L.map((x,j)=>[x,j]).filter(([x,j])=>j<10||x.u.me);
   openSheet(`<div class="hd"><b>${M==='a'?'RANKING DOS AMIGOS':'RANKING GERAL'}</b><button class="b sm" onclick="closeSheet()">✕</button></div>
   <div class="row" style="gap:6px"><span class="tag ok">TEMPORADA DE ${mes.toUpperCase()}</span><span class="tag">ZERA EM ${dias} ${dias===1?'DIA':'DIAS'}</span></div>
@@ -1643,7 +1693,7 @@ window.openRank=()=>{
 window.openCompCfg=first=>{
   const on=LS.get('comp',null)==='sim';
   openSheet(`<div class="hd"><b>${first?'BEM-VINDO AO MAPA':'SEU PERFIL NO RANKING'}</b><button class="b sm" onclick="closeSheet()">✕</button></div>
-  <p class="empty" style="color:var(--txt)">O Mapa mostra os locais onde você e a galera correram, e em cada um aparece a foto de quem tem a melhor marca. Em AMIGOS você vê só você e quem você seguir; em GERAL, todo mundo que entrou no ranking.</p>
+  <p class="empty" style="color:var(--txt)">O Mapa mostra os locais onde você e a galera correram, e em cada um aparece a foto de quem tem a melhor marca. Em AMIGOS você vê só você e os amigos que aceitaram o seu pedido; em GERAL, todo mundo que entrou no ranking.</p>
   <p class="empty" style="margin-top:8px">Para entrar no ranking, o app publica o resumo das suas corridas: data, distância, tempos e o trajeto sem os primeiros e os últimos 200 m, para não mostrar onde você mora. A sua chave do Intervals só é usada para provar que as corridas são suas e não fica guardada. <a href="privacidade.html" target="_blank" rel="noopener" style="color:var(--blue)">Política de privacidade</a>.</p>
   ${first?'':`<div class="card ${on?'cur':''}" style="margin-top:10px"><div class="row" style="justify-content:space-between"><span class="lbl" style="color:var(--txt)">Situação</span><span class="tag ${on?'ok':''}">${on?'NO RANKING':'SÓ OLHANDO'}</span></div></div>`}
   <div class="grid g2" style="margin-top:12px">${on?`<button class="b red" onclick="compSet('nao')">Sair do ranking</button><button class="b" onclick="compSet('sim',1)">Atualizar marcas</button>`:`<button class="b pri" onclick="compSet('sim')">Entrar no ranking</button><button class="b" onclick="compSet('nao')">Só olhar</button>`}</div>`);
