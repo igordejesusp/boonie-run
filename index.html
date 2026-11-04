@@ -169,6 +169,8 @@ svg.ch{width:100%;display:block}
 .cleg{position:absolute;z-index:3;left:10px;bottom:40px;gap:7px;font-size:9px;letter-spacing:.08em;color:var(--dim)}.cleg i{display:inline-block;width:16px;height:0;border-top:2px dashed var(--dim)}.cleg i.lf{border-top:3px solid var(--blue)}.cleg.off{opacity:.45;text-decoration:line-through}
 .fab{position:absolute;z-index:3;right:12px;bottom:40px;width:50px;height:50px;border-radius:50%;background:var(--glass);border:1px solid var(--blue);color:var(--blue);font-size:22px;line-height:1;padding:0}
 .maplibregl-ctrl-attrib{background:var(--glass)!important;color:var(--dim2)!important;font-size:9px}.maplibregl-ctrl-attrib a{color:var(--dim2)!important}.maplibregl-ctrl-attrib-button{filter:invert(1) opacity(.5)}
+a.b{display:flex;align-items:center;justify-content:center;text-decoration:none}
+.cs{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}.cs i{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--blue);color:var(--blue);display:flex;align-items:center;justify-content:center;font-style:normal;font-family:var(--m);font-size:13px}.cs>div>b{display:block;color:var(--hi);font-size:14px;margin-bottom:2px}.cs p b{color:var(--hi);font-weight:600}
 .spin{animation:sp 1s linear infinite}
 /* blocos: cada título de seção e o que vem depois dele; no celular empilham, em tela larga viram colunas */
 .blk>.sec:first-child{margin-top:20px}.blk:first-child>.sec:first-child{margin-top:4px}
@@ -914,11 +916,12 @@ function rMais(){
   h+=`<div class="sec">PARÂMETROS FISIOLÓGICOS<small>DO INTERVALS.ICU</small></div><div class="card"><div class="grid g3"><div class="cell"><div class="lbl">FC máx</div><span class="num">${run.max_hr||CFG.fcmax}</span></div><div class="cell"><div class="lbl">FC limiar</div><span class="num">${run.lthr||'--'}</span></div><div class="cell"><div class="lbl">FC repouso</div><span class="num">${a.rhr||CFG.fcrep}</span></div></div>
   <table style="margin-top:10px"><tr><th>Zona</th><th class="r">FC</th></tr>${z.map((v,i)=>`<tr><td style="font-family:var(--f)">${zn[i]}</td><td class="r">${i?z[i-1]+1:0}–${v}</td></tr>`).join('')}</table>
   <p class="empty" style="margin-top:8px">As zonas vêm do Intervals.icu. Para mudar, edite lá (Configurações → Corrida) e sincronize.</p></div>`;
-  h+=`<div class="sec">CONEXÃO</div><details class="card" ${CFG.key?'':'open'}><summary><span>Intervals.icu</span>${CFG.key?'<span class="tag ok">CONECTADO</span>':'<span class="tag bad">SEM CHAVE</span>'}</summary><label class="f">Athlete ID</label><input id="c-ath" value="${esc(CFG.athlete)}" autocomplete="off"><label class="f">Chave de API (fica só neste aparelho)</label><input id="c-key" type="password" value="${esc(CFG.key)}" autocomplete="off"><div class="row" style="margin-top:10px"><button class="b pri" onclick="saveConn()">Salvar e sincronizar</button></div></details>
+  h+=`<div class="sec">CONEXÃO</div><details class="card" ${CFG.key?'':'open'}><summary><span>Intervals.icu</span>${CFG.key?'<span class="tag ok">CONECTADO</span>':'<span class="tag bad">SEM CHAVE</span>'}</summary>${connForm('saveConn()','Salvar e sincronizar')}</details>
   <div class="sec">SOBRE</div><div class="card"><p class="empty">Coach: por enquanto a leitura e os ajustes são calculados no próprio app (carga pela FC, forma, fadiga, VDOT, deriva cardíaca). A conexão com o Claude pela API da Anthropic entra na próxima fase, por um servidor próprio, para a chave não ficar no celular.</p></div>`;
   $('#mais').innerHTML=h;
+  if($('#c-go'))connStatus();
 }
-window.saveConn=()=>{CFG.athlete=$('#c-ath').value.trim();CFG.key=$('#c-key').value.trim();saveCfg();sync(1)};
+window.saveConn=async()=>{const a=await connTry();if(!a)return;saveCfg();toast('CONECTADO // '+(a.name||''),2500);sync(1)};
 
 /* ================= PERFIL ================= */
 const trilhaKm=()=>Math.max(0,...D.acts.filter(a=>/Walk|Hike/.test(a.type)||a.type==='TrailRun'||/trilha|marcha/i.test(a.name||'')).map(a=>a.dist||0))/1000;
@@ -989,6 +992,55 @@ function openSheet(h){const b=$('#sbox'),on=$('#sheet').classList.contains('on')
 window.closeSheet=()=>$('#sheet').classList.remove('on');
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet()});
 
+/* ================= conexão com o Intervals (assistente passo a passo) ================= */
+// reconhece o ID (i + números) e a chave (texto longo) mesmo colados juntos, com "API_KEY:" ou com espaços
+function parseConn(txt){
+  const t=String(txt||'').replace(/API[_ ]?KEY\s*[:=]?/ig,' ');
+  const id=(t.match(/\bi\d{3,10}\b/i)||[])[0],toks=(t.match(/[A-Za-z0-9]{20,}/g)||[]).sort((a,b)=>b.length-a.length);
+  return {id:id?id.toLowerCase():null,key:toks[0]||null};
+}
+function connVals(){
+  let id=($('#c-ath').value||'').trim().toLowerCase();if(/^\d{3,10}$/.test(id))id='i'+id;
+  const raw=($('#c-key').value||'').trim(),key=parseConn(raw).key||raw.replace(/^API[_ ]?KEY\s*[:=]?/i,'').replace(/\s+/g,'');
+  return {id,key,idOk:/^i\d{3,10}$/.test(id),keyOk:/^[A-Za-z0-9]{16,}$/.test(key),vazio:!id&&!raw};
+}
+window.connStatus=()=>{
+  const v=connVals(),st=$('#c-st'),go=$('#c-go');if(!st||!go)return;
+  const ok=v.idOk&&v.keyOk;go.disabled=!ok;
+  st.innerHTML=v.vazio?'':ok?'<span class="ok">✓ ID e chave encontrados. Agora é só tocar no botão abaixo.</span>'
+    :!v.id?'<span class="warn">Falta o ID do atleta (começa com i).</span>':!v.idOk?'<span class="warn">O ID começa com a letra i, como i123456.</span>'
+    :!v.key?'<span class="warn">Falta a chave de API.</span>':'<span class="warn">A chave parece incompleta. Copie ela inteira.</span>';
+};
+// colou os dois no mesmo campo, ou colou a chave no campo do ID: arruma sozinho
+window.connIn=()=>{
+  const a=$('#c-ath'),k=$('#c-key'),p=parseConn(a.value);
+  if(p.id&&p.key){a.value=p.id;k.value=p.key}else if(!p.id&&p.key&&!k.value.trim()){k.value=p.key;a.value=''}
+  connStatus();
+};
+window.connClip=async()=>{
+  try{
+    const p=parseConn(await navigator.clipboard.readText());
+    if(!p.id&&!p.key)return toast('NÃO ACHEI ID NEM CHAVE NO QUE VOCÊ COPIOU',3500);
+    if(p.id)$('#c-ath').value=p.id;if(p.key)$('#c-key').value=p.key;connStatus();
+    toast(p.id&&p.key?'ID E CHAVE COLADOS':p.id?'ID COLADO // FALTA A CHAVE':'CHAVE COLADA // FALTA O ID',2500);
+  }catch(e){toast('TOQUE NO CAMPO E ESCOLHA COLAR',3500)}
+};
+window.connEye=()=>{const k=$('#c-key'),on=k.type==='password';k.type=on?'text':'password';$('#c-eye').textContent=on?'Ocultar':'Ver'};
+const connForm=(fn,label)=>`<button class="b full" style="margin-top:4px" onclick="connClip()">📋 Colar o que copiei</button>
+  <label class="f">Athlete ID</label><input id="c-ath" value="${esc(CFG.athlete)}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Ex.: i123456" oninput="connIn()">
+  <label class="f">Chave de API (fica só neste aparelho)</label><div class="row" style="flex-wrap:nowrap;gap:8px"><input id="c-key" type="password" value="${esc(CFG.key)}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="connIn()" style="flex:1"><button class="b sm" id="c-eye" type="button" onclick="connEye()">Ver</button></div>
+  <p class="empty" id="c-st" style="min-height:18px;margin-top:8px"></p><button class="b pri full" id="c-go" onclick="${fn}" disabled>${label}</button>`;
+// confere no Intervals antes de guardar; devolve o atleta ou null (e explica o erro na tela)
+async function connTry(){
+  const v=connVals(),st=$('#c-st'),go=$('#c-go'),old=go.textContent,bk=[CFG.athlete,CFG.key];
+  go.disabled=true;go.textContent='Conferindo…';CFG.athlete=v.id;CFG.key=v.key;
+  try{return await api('/athlete/'+v.id)}
+  catch(e){CFG.athlete=bk[0];CFG.key=bk[1];
+    st.innerHTML='<span class="bad">'+(/HTTP 40[13]/.test(e.message)?'O Intervals não aceitou esse ID com essa chave. Copie a chave de novo, inteira, e confira o ID.'
+      :/HTTP 404/.test(e.message)?'Não achei esse ID no Intervals. Ele começa com i, seguido só de números.':'Sem conexão com o Intervals. Confira a internet e tente de novo.')+'</span>';
+    go.textContent=old;go.disabled=false;return null}
+}
+
 /* ================= questionário de boas-vindas ================= */
 const DNOME=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const ORD=[1,2,3,4,5,6,0];
@@ -1014,11 +1066,15 @@ function rOB(){
   const q=v=>typeof v==='string'?`'${v}'`:v;
   const o=(k,v,t,sub)=>`<button class="opt ${a[k]===v?'on':''}" onclick="obSet('${k}',${q(v)})"><span>${t}${sub?`<small>${sub}</small>`:''}</span></button>`;
   let h=s.id==='conn'?'':`<div class="row" style="justify-content:space-between;margin-bottom:8px">${OB.i>(CFG.key?0:1)?`<button class="b sm" onclick="obGo(-1)">◀ Voltar</button>`:OB.force?`<button class="b sm" onclick="obCancel()">Cancelar</button>`:'<span></span>'}<span class="meta">${OB.i+1} de ${st.length}</span></div><div class="bar" style="margin-bottom:18px"><i style="width:${(OB.i+1)/st.length*100}%"></i></div>`;
-  if(s.id==='conn')h+=`<div style="text-align:center;margin:8px 0 14px"><img src="logo.png" alt="" style="height:90px;mix-blend-mode:screen"></div><div class="obh">Bem-vindo ao Boonie Run</div><p class="obp">Para começar, conecte a sua conta do Intervals.icu. É grátis e é onde ficam as suas corridas.</p>
-    <div class="card"><div class="lbl">Onde achar os dados</div><p class="empty" style="margin-top:4px">No site intervals.icu, abra <b style="color:var(--hi)">Settings</b> e desça até <b style="color:var(--hi)">Developer Settings</b>. Lá estão o <b style="color:var(--hi)">Athlete ID</b> e a <b style="color:var(--hi)">API Key</b> (se não tiver chave, toque para gerar).</p></div>
-    <label class="f">Athlete ID</label><input id="c-ath" value="${esc(CFG.athlete)}" autocomplete="off" autocapitalize="off" placeholder="Ex.: i123456"><label class="f">Chave de API (fica só neste celular)</label><input id="c-key" type="password" autocomplete="off">
-    <button class="b pri full" style="margin-top:14px" onclick="obConn()">Conectar</button>
-    <p class="empty" style="margin-top:12px">Não tem conta? Crie em intervals.icu com o seu e-mail. Se o seu relógio não conversa com o Intervals, tudo bem: você segue os treinos pelo app e marca cada um como feito.</p>`;
+  if(s.id==='conn')h+=`<div style="text-align:center;margin:8px 0 14px"><img src="logo.png" alt="" style="height:90px;mix-blend-mode:screen"></div><div class="obh">Bem-vindo ao Boonie Run</div><p class="obp">Para começar, conecte a sua conta do Intervals.icu, o site gratuito onde ficam as suas corridas. São 3 passos.</p>
+    <div class="card"><div class="cs"><i>1</i><div><b>Tenha uma conta no Intervals</b><p class="empty">O cadastro é gratuito. Já tem conta? Pule para o passo 2.</p></div></div><a class="b full" href="https://intervals.icu/" target="_blank" rel="noopener">Abrir o Intervals.icu</a></div>
+    <div class="card"><div class="cs"><i>2</i><div><b>Copie o ID e a chave</b><p class="empty">No Intervals, abra <b>Settings</b> e desça até <b>Developer Settings</b>. Copie o <b>Athlete ID</b> (começa com i). Se ainda não houver uma <b>API Key</b>, crie e copie também.</p></div></div><a class="b full" href="https://intervals.icu/settings" target="_blank" rel="noopener">Abrir as configurações</a></div>
+    <div class="card cur"><div class="cs"><i>3</i><div><b>Cole aqui</b><p class="empty">Volte ao app e toque em Colar. Se copiou o ID e a chave em momentos diferentes, cole um de cada vez.</p></div></div>${connForm('obConn()','Conectar')}</div>
+    <details class="card"><summary><span>Dúvidas frequentes</span></summary>
+    <p class="empty" style="margin-top:8px"><b style="color:var(--hi)">Preciso pagar?</b> O cadastro no Intervals é gratuito.</p>
+    <p class="empty" style="margin-top:8px"><b style="color:var(--hi)">Para que serve a chave?</b> Ela deixa o Boonie Run ler as suas corridas e enviar treinos para a sua conta do Intervals. Fica guardada só neste aparelho.</p>
+    <p class="empty" style="margin-top:8px"><b style="color:var(--hi)">Tenho relógio Garmin.</b> No Intervals, em Settings, abra Connections e ligue o Garmin: as corridas passam a chegar sozinhas.</p>
+    <p class="empty" style="margin-top:8px"><b style="color:var(--hi)">Meu relógio não conversa com o Intervals.</b> Tudo bem. Você segue os treinos pelo app e grava as corridas pelo próprio celular.</p></details>`;
   if(s.id==='oi'){const H=a.H,nm=((D.athlete||{}).name||'').split(' ')[0];
     h+=`<div class="obh">Vamos montar o seu plano${nm?', '+esc(nm):''}</div><p class="obp">São poucas perguntas rápidas. Com as respostas e o seu histórico, o app monta os treinos semana a semana.</p>
     ${H.n?`<div class="card"><div class="lbl">Seu histórico no Intervals</div><div class="grid g3" style="margin-top:6px"><div class="cell"><div class="lbl">Corridas</div><span class="num">${H.n}</span></div><div class="cell"><div class="lbl">Km/semana</div><span class="num">${H.w4.toFixed(1)}</span><div class="meta">últ. 4 sem.</div></div><div class="cell"><div class="lbl">Maior</div><span class="num">${H.L.toFixed(1)}<small> km</small></span><div class="meta">últ. 8 sem.</div></div></div></div>`:`<div class="card"><p class="empty">Ainda não há corridas no seu Intervals. Sem problema: o plano começa leve.</p></div>`}
@@ -1037,16 +1093,12 @@ function rOB(){
     ${lg.length>1?`<p class="empty" style="margin-top:8px">O longão vai de ${kmTxt(lg[0].km)} km até ${kmTxt(Math.max(...lg.map(p=>p.km)))} km. A cada 4 semanas, uma semana mais leve para o corpo assimilar.</p>`:''}
     <button class="b pri full" style="margin-top:14px" onclick="obDone()">Criar meu plano</button>`}
   el.innerHTML=h;
+  if($('#c-go'))connStatus();
 }
 window.obGo=n=>{OB.i+=n;$('#v-ini').scrollTop=0;rOB()};
 window.obSet=(k,v)=>{OB.a[k]=v;obGo(1)};
 window.obDia=d=>{const a=OB.a;a.dias=a.dias.includes(d)?a.dias.filter(x=>x!==d):a.dias.concat(d);if(!a.dias.includes(a.longo))a.longo=a.dias.includes(0)?0:a.dias.includes(6)?6:a.dias[a.dias.length-1];rOB()};
-window.obConn=async()=>{
-  const ath=$('#c-ath').value.trim(),key=$('#c-key').value.trim();if(!ath||!key)return toast('PREENCHA OS DOIS CAMPOS');
-  CFG.athlete=ath;CFG.key=key;
-  try{await api('/athlete/'+ath)}catch(e){CFG.key='';toast('NÃO CONECTOU // CONFIRA O ID E A CHAVE',3500);return}
-  saveCfg();OB={i:0,a:null};await sync(0);
-};
+window.obConn=async()=>{const a=await connTry();if(!a)return;saveCfg();toast('CONECTADO // '+(a.name||''),2500);OB={i:0,a:null};await sync(0)};
 window.obDone=()=>{PF=obPF();LS.set('pf',PF);OB={i:0,a:null};
   // a meta do objetivo entra (ou é atualizada) nos Desafios
   const M=META[PF.meta],P=genPlan(PF);
