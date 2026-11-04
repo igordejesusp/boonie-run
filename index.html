@@ -499,7 +499,9 @@ const LIBT={
     dica:'Rodagem com acelerações que crescem e diminuem (de 15 segundos até 1 minuto e de volta). Entre elas, 3 a 4 minutos leves.'},
   escada:{t:P=>`Escada de ritmos (${P.d===1000?'1 km':P.d+' m'})`,s:P=>[['Leve',P.d,'m','E',1],['Maratona',P.d,'m','M',1],['Leve',P.d,'m','E',1],['Meia',P.d,'m','H',1],['Leve',P.d,'m','E',1],['10K',P.d,'m','T',1],['Leve',P.d,'m','E',1],['5K',P.d,'m','I',1],['Desaquecer',P.d,'m','E',1]],red:P=>null,
     dica:'Cada trecho mais rápido que o anterior: maratona, meia, 10K e 5K, com um trecho leve entre eles. Serve para sentir os ritmos de prova.'},
-  teste1k:{t:P=>'Teste de 1 km',s:P=>[['Aquecer',P.a,'km','E',1],['Estímulo',200,'m','I',3],['Caminha',1,'min','',3],['Parado',3,'min','',1],['TESTE 1 KM',1,'km','R',1],['Parado',3,'min','',1],['Desaquecer',P.d,'km','E',1]],red:P=>null,
+  teste5k:{teste:5000,t:P=>'Teste de 5 km',s:P=>[['Aquecer',1,'km','E',1],['Parado',2,'min','',1],['TESTE 5 KM',5,'km','I',1],['Parado',3,'min','',1],['Desaquecer',2,'km','E',1]],red:P=>null,
+    dica:'Teste do ritmo: depois do aquecimento, corra 5 km no ritmo mais forte que conseguir manter até o fim, sem largar rápido demais. O ritmo no relógio é só uma referência. Depois informe o tempo para o app ajustar os seus ritmos.'},
+  teste1k:{teste:1000,t:P=>'Teste de 1 km',s:P=>[['Aquecer',P.a,'km','E',1],['Estímulo',200,'m','I',3],['Caminha',1,'min','',3],['Parado',3,'min','',1],['TESTE 1 KM',1,'km','R',1],['Parado',3,'min','',1],['Desaquecer',P.d,'km','E',1]],red:P=>null,
     dica:'Teste do ritmo: depois do aquecimento, corra 1 km no máximo que conseguir sustentar até o fim, sem largar rápido demais. O ritmo no relógio é só uma referência. Depois informe o tempo para o app ajustar os seus ritmos.'},
 };
 // degraus de cada nível: cada um se repete 2 semanas antes de subir (como o treinador fazia, que repetia o mesmo treino antes de progredir)
@@ -510,7 +512,7 @@ const LADDER=[
 ];
 const nivelDe=pf=>pf.km0>=25?2:pf.km0>=10?1:0; // 0 iniciante, 1 intermediário, 2 avançado
 const daCodigo=(S,Z)=>S.map(([et,v,u,z,r])=>{const a=[et,String(v)+u,z?Z[z]:null];if(r>1)a[3]=r;a[4]=z;return a});
-function sessaoLib(id,P,Z){const L=LIBT[id],steps=daCodigo(L.s(P),Z);return {tipo:'qualidade',titulo:L.t(P),km:r5(steps.reduce((t,s)=>t+stepKm(s),0))||1,steps,dica:L.dica}}
+function sessaoLib(id,P,Z){const L=LIBT[id],steps=daCodigo(L.s(P),Z);return {tipo:'qualidade',titulo:L.t(P),km:r5(steps.reduce((t,s)=>t+stepKm(s),0))||1,steps,dica:L.dica,...(L.teste?{teste:L.teste}:{})}}
 // reduz o treino até caber no volume da semana (ou até a metade, na semana de alívio)
 function libFit(id,P,Z,qmax,alivio){
   let cur=P,s=sessaoLib(id,cur,Z);const cheio=s.km;
@@ -545,7 +547,7 @@ function genPlan(pf){
     if(k){
       const q=r5(clamp(resto/k*1.15,3,10)),qmax=Math.max(4.5,q*1.5),vale=ymd(addD(m0,7*w+(outros[0]+6)%7))>=pf.inicio;
       if(vale&&(wT<0||(w-wT>=8&&w<N-3))){ // teste de 1 km na 1ª semana possível e de novo a cada 8 semanas
-        wT=w;qs=sessaoLib('teste1k',niv?{a:2,d:2}:{a:1.5,d:1.5},Z);qs.teste=1}
+        wT=w;qs=sessaoLib('teste1k',niv?{a:2,d:2}:{a:1.5,d:1.5},Z)}
       else{
         const [id,P0]=lad[Math.min(li,lad.length-1)];
         qs=libFit(id,id==='acel'?{c:r5(clamp(q-1,2,6))}:P0,Z,qmax,dl);
@@ -713,8 +715,8 @@ function rIni(){
   if(!LS.get('guia'))h+=`<div class="card cur"><div class="lbl" style="color:var(--blue)">COMO USAR</div><p class="empty" style="margin-top:4px">Toque no <b style="color:var(--hi)">?</b> ao lado de cada título para ver o que o número significa. Os cartões de sono, VO2 e FC abrem um resumo com o histórico.</p><button class="b sm pri" style="margin-top:8px" onclick="LS.set('guia',1);render()">Entendi</button></div>`;
   if(D.athlete&&!D.athlete.gAct&&hasWatch())h+=`<div class="card alert"><div class="lbl bad">ALERTA // SINCRONIZAÇÃO</div><p class="empty" style="margin-top:4px">As corridas do Garmin não estão chegando ao Intervals.icu (último treino recebido: ${last?last.date.slice(0,10).split('-').reverse().join('/'):'nenhum'}). Veja MAIS → Dispositivos.</p></div>`;
   // resultado do teste de 1 km ainda não aplicado
-  const tf=testeAchado();
-  if(tf)h+=`<div class="card cur"><div class="lbl" style="color:var(--blue)">TESTE DE 1 KM</div>${tf.t?`<h2 style="margin-top:4px">Seu 1 km: ${fmtT(tf.t)}</h2><p class="empty" style="margin-top:4px">Use o resultado para ajustar os ritmos dos seus treinos.</p><button class="b sm pri" style="margin-top:8px" onclick="abrirTeste('${tf.date}',${tf.t})">Ver novos ritmos</button>`:`<p class="empty" style="margin-top:4px">Você fez o teste de ${fmtD(tf.date)}. Informe o tempo do 1 km para ajustar os ritmos dos seus treinos.</p><button class="b sm pri" style="margin-top:8px" onclick="abrirTeste('${tf.date}')">Informar o tempo</button>`}</div>`;
+  const tf=testeAchado(),tk=tf&&tf.d/1000;
+  if(tf)h+=`<div class="card cur"><div class="lbl" style="color:var(--blue)">TESTE DE ${tk} KM</div>${tf.t?`<h2 style="margin-top:4px">Seu ${tk} km: ${fmtT(tf.t)}</h2><p class="empty" style="margin-top:4px">Use o resultado para ajustar os ritmos dos seus treinos.</p><button class="b sm pri" style="margin-top:8px" onclick="abrirTeste('${tf.date}',${tf.t},${tf.d})">Ver novos ritmos</button>`:`<p class="empty" style="margin-top:4px">Você fez o teste de ${fmtD(tf.date)}. Informe o tempo dos ${tk} km para ajustar os ritmos dos seus treinos.</p><button class="b sm pri" style="margin-top:8px" onclick="abrirTeste('${tf.date}',null,${tf.d})">Informar o tempo</button>`}</div>`;
   // último treino
   h+=`<div class="sec">ÚLTIMO TREINO<small>${last?DOW[parseD(last.date).getDay()]+' '+last.date.slice(8,10)+'/'+last.date.slice(5,7):''}</small></div>`;
   if(last){const pace=last.mov/last.dist*1000;
@@ -740,7 +742,7 @@ function rIni(){
     <button class="b ${hasWatch()?'':'pri'} full" style="margin-top:8px" onclick="fazerTreino('${nx.date}')">▶ Fazer treino agora</button>
     <div class="grid g2" style="margin-top:8px">${nx.date<=ds?`<button class="b" onclick="markDone('${nx.date}')">✓ Marcar feito</button>`:`<button class="b" onclick="openDay('${nx.date}')">Ver o dia</button>`}<button class="b" onclick="openBuilder('${nx.date}')">Editar treino</button></div></div>`}
   else if(PF)h+=`<div class="card cur"><h2>Plano concluído</h2><p class="empty" style="margin-top:4px">Os treinos deste ciclo acabaram. Responda o questionário de novo para montar o próximo com base no que você fez.</p><button class="b pri full" style="margin-top:10px" onclick="redoPlan()">Montar o próximo plano</button></div>`;
-  else h+=`<div class="card"><p class="empty">Nenhuma atividade planejada.</p><button class="b full" style="margin-top:8px" onclick="openBuilder()">+ Criar treino</button></div>`;
+  else h+=`<div class="card"><p class="empty">Nenhuma atividade planejada.</p><button class="b full" style="margin-top:8px" onclick="openBib()">+ Escolher um treino</button></div>`;
   h+=`<div class="meta" style="text-align:center;margin-top:14px">${D.at?'Sincronizado '+new Date(D.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'Nunca sincronizado'}</div>`;
   el.innerHTML=h;
 }
@@ -832,7 +834,7 @@ window.openVital=(k,per)=>{
 /* ================= CALENDÁRIO ================= */
 let calMode='sem',calRef=TODAY();
 function rCal(){
-  const ds0=ymd(TODAY());let h=`<div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="seg"><button class="${calMode==='sem'?'on':''}" onclick="calSet('sem')">SEMANAL</button><button class="${calMode==='mes'?'on':''}" onclick="calSet('mes')">MENSAL</button></div><div class="row"><button class="b sm" onclick="calGo(0)">HOJE</button><button class="b sm pri" onclick="openBuilder()" aria-label="Criar treino">+ TREINO</button></div></div>`;
+  const ds0=ymd(TODAY());let h=`<div class="row" style="justify-content:space-between;margin-bottom:10px"><div class="seg"><button class="${calMode==='sem'?'on':''}" onclick="calSet('sem')">SEMANAL</button><button class="${calMode==='mes'?'on':''}" onclick="calSet('mes')">MENSAL</button></div><div class="row"><button class="b sm" onclick="calGo(0)">HOJE</button><button class="b sm pri" onclick="openBib()" aria-label="Escolher um treino da biblioteca">+ TREINO</button></div></div>`;
   if(calMode==='sem'){
     const m=monday(calRef),e=addD(m,6);let tk=0,pk=0;
     h+=`<div class="wk"><button class="b sm" onclick="calGo(-1)">◀</button><b>${m.getDate()} ${MES[m.getMonth()]} — ${e.getDate()} ${MES[e.getMonth()]}</b><button class="b sm" onclick="calGo(1)">▶</button></div>`;
@@ -862,10 +864,10 @@ window.openDay=ds=>{
   let h=`<div class="hd"><b>${DOW[d.getDay()]} ${ds.split('-').reverse().join('/')}</b><button class="b sm" onclick="closeSheet()">✕</button></div>`;
   if(p)h+=`<div class="card cur"><div class="row" style="justify-content:space-between"><span class="lbl">PLANEJADO · ${tipoIc[p.tipo]}</span>${tagSt[status(p)]}</div><h2 style="margin-top:4px">${esc(p.titulo)}</h2><div class="meta">${p.km} km</div>${stepsHtml(p)}${p.dica?`<p class="empty" style="margin-top:8px">${esc(p.dica)}</p>`:''}${p.why?`<div class="coach"><b>AJUSTE DO COACH</b>${esc(p.why)}</div>`:''}${ds>=ymd(TODAY())&&hasWatch()?`<button class="b pri full" style="margin-top:10px" onclick="sendWatch('${ds}')">▲ Enviar ao relógio</button>`:''}
     ${ds>=ymd(TODAY())?`<button class="b ${hasWatch()?'':'pri'} full" style="margin-top:8px" onclick="fazerTreino('${ds}')">▶ Fazer treino agora</button>`:''}
-    <div class="grid g2" style="margin-top:8px">${ds<=ymd(TODAY())&&status(p)!=='cumprido'?`<button class="b" onclick="markDone('${ds}')">✓ Marcar feito</button>`:''}${ds>=ymd(TODAY())?`<button class="b" onclick="openBuilder('${ds}')">Editar treino</button>`:''}</div>${p.teste&&PF&&ds<=ymd(TODAY())?`<button class="b full" style="margin-top:8px" onclick="abrirTeste('${ds}')">Informar o tempo do teste</button>`:''}</div>`;
+    <div class="grid g2" style="margin-top:8px">${ds<=ymd(TODAY())&&status(p)!=='cumprido'?`<button class="b" onclick="markDone('${ds}')">✓ Marcar feito</button>`:''}${ds>=ymd(TODAY())?`<button class="b" onclick="openBuilder('${ds}')">Editar treino</button>`:''}</div>${p.teste&&ds<=ymd(TODAY())?`<button class="b full" style="margin-top:8px" onclick="abrirTeste('${ds}',null,${p.teste})">Informar o tempo do teste</button>`:''}</div>`;
   ex.forEach(a=>h+=`<div class="card" onclick="openAct('${a.id}')"><div class="row" style="justify-content:space-between"><span class="lbl">EXECUTADO · ${typeIc(a)}</span>${a.src==='MANUAL'?'<span class="tag">MARCADO À MÃO</span>':''}</div><h2 style="margin-top:4px">${esc(a.name)}</h2><div class="meta">${a.dist?km(a.dist)+' km · ':''}${fmtT(a.mov)}${isRun(a)&&a.dist?' · '+fmtP(a.mov/a.dist*1000)+'/km':''}${a.hr?' · '+a.hr+' bpm':''}</div>${isMan(a)?`<button class="b sm" style="margin-top:8px" onclick="event.stopPropagation();undoMan('${a.id}')">Desfazer</button>`:''}</div>`);
   if(!p&&!ex.length)h+=`<p class="empty">Dia de descanso.</p>`;
-  if(!p&&ds>=ymd(TODAY()))h+=`<button class="b full" style="margin:8px 0" onclick="openBuilder('${ds}')">+ Criar treino neste dia</button>`;
+  if(!p&&ds>=ymd(TODAY()))h+=`<button class="b full" style="margin:8px 0" onclick="openBib('${ds}')">+ Treino neste dia</button>`;
   if(!p&&!ex.some(isRun)&&ds<=ymd(TODAY()))h+=`<button class="b full" style="margin:8px 0" onclick="markDone('${ds}')">✓ Registrar corrida feita</button>`;
   h+=`<div class="grid g3" style="margin-top:6px"><div class="cell"><div class="lbl">Sono</div><span class="num">${fmtSleep(w.sleep)}</span></div><div class="cell"><div class="lbl">FC rep.</div><span class="num">${w.rhr||'--'}</span></div><div class="cell"><div class="lbl">Passos</div><span class="num">${w.steps?(w.steps/1000).toFixed(1)+'k':'--'}</span></div></div>`;
   openSheet(h);
@@ -975,6 +977,7 @@ function rMais(){
     h+=`<div class="sec">MEU PLANO</div><div class="card"><div class="grid g2"><div class="cell"><div class="lbl">Meta</div><span class="num" style="font-size:14px">${M.n}</span></div><div class="cell"><div class="lbl">Duração</div><span class="num" style="font-size:14px">${P.length?fmtD(P[0].date)+' a '+fmtD(P[P.length-1].date):'--'}</span></div><div class="cell"><div class="lbl">Dias</div><span class="num" style="font-size:14px">${ORD.filter(d=>PF.dias.includes(d)).map(d=>DOW[d]).join(' ')}</span></div><div class="cell"><div class="lbl">Longão</div><span class="num" style="font-size:14px">${DNOME[ld]}</span></div></div>
     <p class="empty" style="margin-top:8px">Ritmo leve: ${fmtP(Z.E[0])}–${fmtP(Z.E[1])}/km. O volume sobe no máximo 8% por semana e, a cada 4 semanas, uma semana mais leve para o corpo assimilar.</p><p class="empty" style="margin-top:6px">Nível do plano: <b style="color:var(--hi)">${['iniciante','intermediário','avançado'][nivelDe(PF)]}</b>. Cada treino de qualidade se repete por 2 semanas antes de subir de degrau, e a cada 8 semanas o app marca um teste de 1 km para recalibrar os seus ritmos.</p>
     <button class="b full" style="margin-top:10px" onclick="redoPlan()">Refazer o questionário</button></div>`}
+  h+=`<div class="sec">BIBLIOTECA DE TREINOS</div><div class="card"><p class="empty" style="color:var(--txt)">${BIBL.length} treinos prontos: rodagens, fartlek, ritmo, tiros, HIIT, pirâmide, escada de ritmos e testes. Veja como é cada um e agende no calendário, nos seus ritmos.</p><button class="b pri full" style="margin-top:10px" onclick="openBib()">Abrir a biblioteca</button></div>`;
   h+=`<div class="sec">MÉTRICAS AVANÇADAS</div><div class="card"><div class="grid g2"><div class="cell"><div class="lbl" style="display:flex;align-items:center;justify-content:space-between">VDOT ${qb('vdot')}</div><span class="num">${V?V.v.toFixed(1):'--'}</span><div class="meta">${V?(V.est?'estimado pelo questionário':'base: '+(V.dist/1000)+' km em '+fmtT(V.t)):'sem esforço de 1,5 km ou mais'}</div></div><div class="cell"><div class="lbl" style="display:flex;align-items:center;justify-content:space-between">Rampa 7 dias ${qb('rampa')}</div><span class="num ${ramp>8?'bad':ramp>5?'warn':''}">${(ramp>0?'+':'')+ramp.toFixed(1)}</span><div class="meta">seguro: até +5 por semana</div></div></div>
   ${V?`<div class="lbl" style="margin-top:12px">Projeção de prova (condicionamento atual)</div><table style="margin-top:4px"><tr><th>Prova</th><th class="r">Tempo</th><th class="r">Ritmo</th></tr>${[[5000,'5 km'],[10000,'10 km'],[21097.5,'21 km'],[42195,'42 km']].map(([d,n])=>{const s=predict(V.v,d);return `<tr><td>${n}</td><td class="r">${fmtT(s)}</td><td class="r">${fmtP(s/d*1000)}</td></tr>`}).join('')}</table>
   <div class="lbl" style="margin-top:12px">Ritmos de treino (Daniels)</div><table style="margin-top:4px">${[['E','Leve / rodagem'],['M','Maratona'],['T','Limiar'],['I','Intervalado'],['R','Repetição']].map(([k,n])=>`<tr><td>${k}</td><td style="font-family:var(--f)">${n}</td><td class="r">${fmtP(Z[k][0])}–${fmtP(Z[k][1])}</td></tr>`).join('')}</table>`:''}
@@ -1258,45 +1261,136 @@ function devApp(lastRun){
   <div class="row" style="margin-top:10px"><button class="b sm pri" onclick="sync(1)">Sincronizar tudo</button></div></div>`;
 }
 
-/* ================= teste de 1 km: atualiza os ritmos ================= */
-// melhor km da corrida do dia do teste (ou nada, se o app ainda não analisou); ignora testes já aplicados
+/* ================= teste de 1 km ou 5 km: atualiza os ritmos ================= */
+// quem tem plano gerado guarda o condicionamento no plano; quem tem plano próprio (como o Igor) guarda por 90 dias em 'vt'
+const testesFeitos=()=>PF?(PF.tests||{}):LS.get('vtests',{});
+// melhor trecho da corrida do dia do teste (ou nada, se o app ainda não analisou); ignora testes já aplicados
 function testeAchado(){
-  if(!PF)return null;const hoje=ymd(TODAY()),T=PF.tests||{};
-  const p=plan().filter(x=>x.teste&&x.date<=hoje&&!(x.date in T)).pop();if(!p)return null;
-  if(!runsOn(p.date).length)return null;
-  const ts=runsOn(p.date).map(a=>bestIn(a,1000)).filter(Boolean);
-  return {date:p.date,t:ts.length?Math.min(...ts):null};
+  const hoje=ymd(TODAY()),T=testesFeitos();
+  const p=plan().filter(x=>x.teste&&x.date<=hoje&&!(x.date in T)).pop();if(!p||!runsOn(p.date).length)return null;
+  const d=p.teste===5000?5000:1000,ts=runsOn(p.date).map(a=>bestIn(a,d)).filter(Boolean);
+  return {date:p.date,d,t:ts.length?Math.min(...ts):null};
 }
 // condicionamento novo pelo teste: se o anterior vinha do histórico real, não deixa pular mais de 5 pontos
-function testeNovoV(t){const ant=PF.V,V=vdot(1000,t);return Math.round((PF.Vsrc==='historico'?clamp(V,ant-5,ant+5):V)*10)/10}
-window.abrirTeste=(ds,t)=>{
-  if(!PF)return;
-  openSheet(`<div class="hd"><b>TESTE DE 1 KM</b><button class="b sm" onclick="closeSheet()">✕</button></div>
-  <p class="empty" style="color:var(--txt)">Informe quanto tempo você levou no 1 km em esforço máximo. O app recalcula o seu condicionamento e os ritmos dos treinos.</p>
-  <label class="f">Tempo do 1 km (minutos:segundos)</label><input id="t-t" type="text" inputmode="numeric" placeholder="Ex.: 4:15" value="${t?fmtT(t):''}" oninput="testePrev()">
+function testeNovoV(t,d){const ant=PF?PF.V:(curV()||32),V=vdot(d,t),hist=PF?PF.Vsrc==='historico':true;return Math.round((hist?clamp(V,ant-5,ant+5):V)*10)/10}
+let TEST={ds:null,d:1000};
+window.abrirTeste=(ds,t,d)=>{
+  TEST={ds,d:d===5000?5000:1000};const k=TEST.d/1000;
+  openSheet(`<div class="hd"><b>TESTE DE ${k} KM</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <p class="empty" style="color:var(--txt)">Informe quanto tempo você levou nos ${k} km em esforço máximo. O app recalcula o seu condicionamento e os ritmos dos treinos.</p>
+  <label class="f">Tempo dos ${k} km (minutos:segundos)</label><input id="t-t" type="text" inputmode="numeric" placeholder="Ex.: ${k===1?'4:15':'25:30'}" value="${t?fmtT(t):''}" oninput="testePrev()">
   <div id="t-prev"></div>
-  <button class="b pri full" id="t-ok" style="margin-top:12px" onclick="aplicaTeste('${ds}')" disabled>Atualizar meus ritmos</button>
-  <button class="b full" style="margin-top:8px" onclick="ignoraTeste('${ds}')">Ignorar este teste</button>`);
+  <button class="b pri full" id="t-ok" style="margin-top:12px" onclick="aplicaTeste()" disabled>Atualizar meus ritmos</button>
+  <button class="b full" style="margin-top:8px" onclick="ignoraTeste()">Ignorar este teste</button>`);
   testePrev();
 };
 window.testePrev=()=>{
-  const v=$('#t-t').value,t=parseT(v),ok=!!t&&t>=150&&t<=600,b=$('#t-ok'),el=$('#t-prev');b.disabled=!ok;
-  if(!ok){el.innerHTML=v?'<p class="empty bad" style="margin-top:8px">Tempo fora do esperado: use entre 2:30 e 10:00.</p>':'';return}
-  const V=testeNovoV(t),A=zonesFor(PF.V),B=zonesFor(V),f=z=>fmtP(z[0])+'–'+fmtP(z[1]);
+  const v=$('#t-t').value,t=parseT(v),d=TEST.d,lim=d===1000?[150,600]:[720,2400],ok=!!t&&t>=lim[0]&&t<=lim[1],b=$('#t-ok'),el=$('#t-prev');b.disabled=!ok;
+  if(!ok){el.innerHTML=v?`<p class="empty bad" style="margin-top:8px">Tempo fora do esperado: use entre ${fmtT(lim[0])} e ${fmtT(lim[1])}.</p>`:'';return}
+  const ant=PF?PF.V:(curV()||32),V=testeNovoV(t,d),A=zonesFor(ant),B=zonesFor(V),f=z=>fmtP(z[0])+'–'+fmtP(z[1]);
   el.innerHTML=`<div class="card" style="margin-top:10px"><table><tr><th></th><th class="r">Antes</th><th class="r">Depois</th></tr>
-  <tr><td style="font-family:var(--f)">Condicionamento (VDOT)</td><td class="r">${PF.V}</td><td class="r ok">${V}</td></tr>
+  <tr><td style="font-family:var(--f)">Condicionamento (VDOT)</td><td class="r">${Math.round(ant*10)/10}</td><td class="r ok">${V}</td></tr>
   <tr><td style="font-family:var(--f)">Ritmo leve</td><td class="r">${f(A.E)}</td><td class="r ok">${f(B.E)}</td></tr>
   <tr><td style="font-family:var(--f)">Ritmo de limiar</td><td class="r">${f(A.T)}</td><td class="r ok">${f(B.T)}</td></tr>
-  <tr><td style="font-family:var(--f)">Tiros fortes</td><td class="r">${f(A.I)}</td><td class="r ok">${f(B.I)}</td></tr></table></div>`;
+  <tr><td style="font-family:var(--f)">Tiros fortes</td><td class="r">${f(A.I)}</td><td class="r ok">${f(B.I)}</td></tr></table></div>${PF?'':'<p class="empty" style="margin-top:8px">Vale para os treinos da biblioteca e do criador. O seu plano atual já tem ritmos próprios e não muda.</p>'}`;
 };
-window.aplicaTeste=ds=>{
-  const t=parseT($('#t-t').value);if(!PF||!(t>=150&&t<=600))return;
-  PF.V=testeNovoV(t);PF.Vsrc='teste';PF.tests={...(PF.tests||{}),[ds]:Math.round(t)};LS.set('pf',PF);closeSheet();toast('RITMOS ATUALIZADOS');render();
+window.aplicaTeste=()=>{
+  const t=parseT($('#t-t').value),d=TEST.d,lim=d===1000?[150,600]:[720,2400];if(!(t>=lim[0]&&t<=lim[1]))return;
+  const V=testeNovoV(t,d);
+  if(PF){PF.V=V;PF.Vsrc='teste';PF.tests={...(PF.tests||{}),[TEST.ds]:Math.round(t)};LS.set('pf',PF)}
+  else{LS.set('vt',{V,ds:TEST.ds});LS.set('vtests',{...LS.get('vtests',{}),[TEST.ds]:Math.round(t)})}
+  closeSheet();toast('RITMOS ATUALIZADOS');render();
 };
-window.ignoraTeste=ds=>{if(!PF)return;PF.tests={...(PF.tests||{}),[ds]:0};LS.set('pf',PF);closeSheet();render()};
+window.ignoraTeste=()=>{
+  if(PF){PF.tests={...(PF.tests||{}),[TEST.ds]:0};LS.set('pf',PF)}else LS.set('vtests',{...LS.get('vtests',{}),[TEST.ds]:0});
+  closeSheet();render();
+};
+
+/* ================= biblioteca de treinos (tela) ================= */
+const NIVN=['INICIANTE','INTERMEDIÁRIO','AVANÇADO'];
+const nivelUsuario=()=>{if(PF)return nivelDe(PF);const w=histo().w4;return w>=25?2:w>=10?1:0};
+const Li=(id,nome,Ps)=>({id,nome,dica:LIBT[id].dica,gen:(n,Z)=>sessaoLib(id,Ps[n],Z)});
+const Lb=(nome,tipo,dica,titulo,steps)=>({id:nome,nome,dica,gen:(n,Z)=>({tipo,titulo:titulo(n),steps:daCodigo(steps(n),Z)})});
+const BIBG=[
+  ['Base',[
+    Lb('Rodagem leve','rodagem','Corrida contínua em ritmo leve, em que dá para conversar. É a base de tudo.',n=>'Rodagem leve',n=>[['Contínuo',[4,6,10][n],'km','E',1]]),
+    Lb('Longão','longo','O treino mais longo da semana, em ritmo leve e constante. Vá devagar e termine inteiro.',n=>'Longão '+[6,10,16][n]+' km',n=>[['Contínuo',[6,10,16][n],'km','E',1]]),
+    Lb('Corre e caminha','rodagem','Alterna corrida leve e caminhada. Ótimo para quem está começando ou voltando.',n=>'Corre e caminha',n=>[['Corre',[2,3,5][n],'min','E',8],['Caminhada',1,'min','',8]]),
+  ]],
+  ['Fartlek',[
+    Li('fartlekC','Fartlek curto',[{n:5},{n:6},{n:8}]),
+    Li('fartlek','Fartlek de 500 m',[{n:3,d:500},{n:5,d:500},{n:6,d:500}]),
+    Li('fartlek','Fartlek de 1 km',[{n:2,d:1000},{n:3,d:1000},{n:5,d:1000}]),
+  ]],
+  ['Ritmo e limiar',[
+    Li('ritmo1k','Ritmo de 1 km',[{n:2},{n:3},{n:5}]),
+    Li('limiar','Limiar contínuo',[{x:2},{x:3},{x:5}]),
+  ]],
+  ['Intervalados',[
+    Li('tiros400','Tiros de 400 m',[{n:5},{n:8},{n:10}]),
+    Li('hiit110','HIIT 110–115 (800 m)',[{n:3,d:800,w:[1.5,1]},{n:5,d:800,w:[1.5,1]},{n:6,d:800}]),
+    Li('hiit110','HIIT 110–115 (1 km)',[{n:3,d:1000,w:[1.5,1]},{n:5,d:1000,w:[1.5,1]},{n:6,d:1000}]),
+    Li('curtoLongo','HIIT curto e longo',[{b:1},{b:2},{b:3}]),
+    Li('hiit125','HIIT 125',[{n:6},{n:8},{n:12}]),
+    Li('hiit130','HIIT 130/120',[{a:2,b:2},{a:3,b:3},{a:3,b:4}]),
+  ]],
+  ['Acelerações e variação',[
+    Li('acel','Rodagem com acelerações',[{c:3},{c:4},{c:5}]),
+    Li('piramide','Pirâmide de acelerações',[{k:6},{k:6},{k:8}]),
+    Li('escada','Escada de ritmos',[{d:400},{d:500},{d:1000}]),
+  ]],
+  ['Testes',[
+    Li('teste1k','Teste de 1 km',[{a:1.5,d:1.5},{a:2,d:2},{a:2,d:2}]),
+    Li('teste5k','Teste de 5 km',[{},{},{}]),
+  ]],
+];
+const BIBL=BIBG.flatMap(g=>g[1]);
+let BIB={niv:null,ds:null,i:0};
+function bibSessao(it){const p=it.gen(BIB.niv,zonesFor(curV()));p.km=p.km||r5(p.steps.reduce((t,s)=>t+stepKm(s),0))||1;return p}
+window.openBib=ds=>{
+  const hoje=ymd(TODAY());if(typeof ds==='string')BIB.ds=ds;else if(!BIB.ds||BIB.ds<hoje)BIB.ds=hoje;
+  if(BIB.niv==null)BIB.niv=nivelUsuario();
+  let h=`<div class="hd"><b>BIBLIOTECA DE TREINOS</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <p class="empty">Escolha um treino, veja como ele é e agende no calendário. Os treinos vêm no tamanho do nível escolhido e com os seus ritmos.</p>
+  <div class="seg" style="margin:10px 0">${NIVN.map((n,k)=>`<button class="${BIB.niv===k?'on':''}" onclick="bibNivel(${k})">${n}</button>`).join('')}</div>`;
+  let k=0;
+  for(const [g,L] of BIBG){h+=`<div class="sec">${g.toUpperCase()}</div>`;
+    for(const it of L){const p=bibSessao(it);
+      h+=`<button class="cell tap" style="margin-bottom:8px;padding-right:24px" onclick="bibItem(${k})"><b style="color:var(--hi);font-size:14px">${esc(it.nome)}</b><div class="meta">${kmTxt(p.km)} km${p.teste?' · teste':''}</div><div class="meta" style="margin-top:2px;color:var(--txt)">${esc(it.dica.split('. ')[0])}.</div></button>`;k++}}
+  h+=`<button class="b full" style="margin-top:8px" onclick="openBuilder()">+ Criar do zero</button>`;
+  openSheet(h);
+};
+window.bibNivel=k=>{BIB.niv=k;const sc=$('#sbox').scrollTop;openBib();$('#sbox').scrollTop=sc};
+window.bibItem=i=>{
+  BIB.i=i;const it=BIBL[i],p=bibSessao(it);
+  openSheet(`<div class="hd"><b>${esc(it.nome.toUpperCase())}</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <div class="row" style="justify-content:space-between"><span class="tag">${NIVN[BIB.niv]}</span><span class="meta">${kmTxt(p.km)} km</span></div>
+  <h2 style="margin-top:6px">${esc(p.titulo)}</h2>${stepsHtml(p)}<p class="empty" style="margin-top:8px">${esc(it.dica)}</p>
+  <label class="f">Em que dia?</label><input id="bib-d" type="date" value="${BIB.ds}" min="${ymd(TODAY())}">
+  <button class="b pri full" style="margin-top:12px" onclick="bibAgendar(0)">Agendar no calendário</button>
+  <div class="grid g2" style="margin-top:8px"><button class="b" onclick="bibAgendar(2)">▶ Fazer agora</button><button class="b" onclick="bibAjustar()">Ajustar antes</button></div>
+  ${hasWatch()?`<button class="b full" style="margin-top:8px" onclick="bibAgendar(1)">Agendar e enviar ao relógio</button>`:''}
+  <button class="b full" style="margin-top:8px" onclick="openBib()">◀ Voltar à biblioteca</button>`);
+};
+// modo 0: agenda; 1: agenda e envia ao relógio; 2: faz agora (agenda para hoje e abre a gravação)
+window.bibAgendar=mode=>{
+  const hoje=ymd(TODAY()),ds=mode===2?hoje:$('#bib-d').value;
+  if(!ds)return toast('ESCOLHA O DIA');if(ds<hoje)return toast('ESCOLHA UM DIA A PARTIR DE HOJE');
+  const p=bibSessao(BIBL[BIB.i]),ant=planOn(ds);
+  if(ant&&!confirm(`Já existe "${ant.titulo}" ${ds===hoje?'hoje':'neste dia'}. Trocar pelo treino da biblioteca?`))return;
+  p.date=ds;p.custom=1;const ex=LS.get('extra',{}),ov=LS.get('ov',{});ex[ds]=p;delete ov[ds];LS.set('extra',ex);LS.set('ov',ov);
+  BIB.ds=ds;closeSheet();toast('TREINO AGENDADO');render();
+  if(mode===1)sendWatch(ds);if(mode===2)openRec(ds);
+};
+// abre o criador de treino já com as etapas do treino escolhido, para mudar repetições, distâncias e ritmos
+window.bibAjustar=()=>{
+  const p=bibSessao(BIBL[BIB.i]),Z=zonesFor(curV());
+  BD={date:$('#bib-d').value||BIB.ds,orig:null,titulo:p.titulo,tipo:p.tipo,steps:p.steps.map(s=>({et:s[0],v:parseFloat(s[1]),u:unitOf(s[1]),z:s[4]!=null?s[4]:zoneOf(s[2],Z),r:s[3]||1}))};
+  drawB();
+};
 
 /* ================= marcar como feito ================= */
-const curV=()=>isIgor()?(curVdot()||{}).v:(PF&&PF.V)||(curVdot()||{}).v;
+const curV=()=>{if(PF)return PF.V;const vt=LS.get('vt');return vt&&Date.now()-new Date(vt.ds)<90*864e5?vt.V:(curVdot()||{}).v};
 window.markDone=ds=>{
   const p=planOn(ds),E=zonesFor(curV()).E,mins=p?Math.round(p.km*(E[0]+E[1])/120):'';
   openSheet(`<div class="hd"><b>MARCAR COMO FEITO</b><button class="b sm" onclick="closeSheet()">✕</button></div>
@@ -1791,7 +1885,7 @@ window.recEnd=()=>{
   if(REC.dist<50&&!confirm('A corrida tem menos de 50 m. Finalizar mesmo assim?'))return;
   const mv=recMov(),w=REC.wk,g=REC.g||{},laps=w?[...w.laps]:[];
   if(w&&w.i<w.steps.length){const e=w.steps[w.i],dd=REC.dist-w.d0,tt=mv-w.t0;if(dd>20||tt>10)laps.push({nome:e.nome,r:e.r,n:e.n,dist:Math.round(dd),t:Math.round(tt),parcial:1})}
-  const ruim=!!(g.ocN||g.max>=20||g.fraco>Math.max(10,(g.ok||0)*.3)),tl=laps.find(l=>/TESTE 1 KM/i.test(l.nome)&&l.dist>=800);
+  const ruim=!!(g.ocN||g.max>=20||g.fraco>Math.max(10,(g.ok||0)*.3)),tl=laps.find(l=>/TESTE [15] KM/i.test(l.nome)&&l.dist>=800);
   const itens=[(g.ok||0)+' pontos válidos'];
   if(g.fraco)itens.push(g.fraco+' descartados por sinal fraco');if(g.salto)itens.push(g.salto+' por salto de posição');
   if(g.max>=10)itens.push('maior tempo sem sinal: '+g.max+' s');if(g.ocN)itens.push('app fora da tela '+g.ocN+'× ('+fmtT(g.ocMs/1000)+')');
@@ -1799,7 +1893,7 @@ window.recEnd=()=>{
   <div class="grid g3"><div class="cell"><div class="lbl">Distância</div><span class="num">${km(REC.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(mv)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${REC.dist>50?fmtP(mv/REC.dist*1000):'--'}</span></div></div>
   ${w?`<div class="sec">TREINO<small>${w.laps.length} DE ${w.steps.length} ETAPAS</small></div><table><tr><th>Etapa</th><th class="r">Dist.</th><th class="r">Tempo</th><th class="r">Ritmo</th></tr>${laps.map(l=>`<tr><td style="font-family:var(--f)">${esc(nomeE(l))}${l.n?' '+l.r+'/'+l.n:''}${l.parcial?' (parcial)':''}</td><td class="r">${l.dist>=1000?kmTxt((l.dist/1000).toFixed(2)):l.dist+' m'}</td><td class="r">${fmtT(l.t)}</td><td class="r">${l.dist>50?fmtP(l.t/l.dist*1000):'--'}</td></tr>`).join('')}</table>`:''}
   ${REC.splits.length?`<div class="sec">PARCIAIS</div><table><tr><th>KM</th><th class="r">Ritmo</th></tr>${REC.splits.map((s,i)=>`<tr><td>${i+1}</td><td class="r">${fmtP(s)}</td></tr>`).join('')}</table>`:''}
-  ${tl?`<div class="card cur" style="margin-top:12px"><div class="lbl" style="color:var(--blue)">TESTE DE 1 KM</div><p class="empty" style="margin-top:4px;color:var(--txt)">Seu 1 km: <b style="color:var(--hi)">${fmtT(tl.t)}</b>. Depois de salvar, toque em "Ver novos ritmos" no Início para ajustar os seus treinos.</p></div>`:''}
+  ${tl?`<div class="card cur" style="margin-top:12px"><div class="lbl" style="color:var(--blue)">TESTE DE ${/5 KM/i.test(tl.nome)?5:1} KM</div><p class="empty" style="margin-top:4px;color:var(--txt)">Seu ${/5 KM/i.test(tl.nome)?5:1} km: <b style="color:var(--hi)">${fmtT(tl.t)}</b>. Depois de salvar, toque em "Ver novos ritmos" no Início para ajustar os seus treinos.</p></div>`:''}
   <div class="card ${ruim?'alert':''}" style="margin-top:12px"><div class="lbl ${ruim?'bad':''}">QUALIDADE DO GPS</div><p class="empty" style="margin-top:4px">${itens.join(' · ')}.</p>${ruim?'<p class="empty" style="margin-top:6px;color:var(--txt)">O GPS falhou em parte da corrida, então a distância pode estar menor que a real. Nas próximas, deixe a tela ligada e não troque de app.</p>':''}</div>
   <label class="f">Nome da corrida</label><input id="r-nome" value="${esc(w?w.t:'Corrida')}">
   <button class="b pri full" style="margin-top:14px" onclick="recSave()">Salvar</button>
