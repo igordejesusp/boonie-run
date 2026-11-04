@@ -171,6 +171,15 @@ svg.ch{width:100%;display:block}
 .maplibregl-ctrl-attrib{background:var(--glass)!important;color:var(--dim2)!important;font-size:9px}.maplibregl-ctrl-attrib a{color:var(--dim2)!important}.maplibregl-ctrl-attrib-button{filter:invert(1) opacity(.5)}
 a.b{display:flex;align-items:center;justify-content:center;text-decoration:none}
 .cs{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}.cs i{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--blue);color:var(--blue);display:flex;align-items:center;justify-content:center;font-style:normal;font-family:var(--m);font-size:13px}.cs>div>b{display:block;color:var(--hi);font-size:14px;margin-bottom:2px}.cs p b{color:var(--hi);font-weight:600}
+.etp{border:1px solid var(--blue);background:var(--sel);border-radius:8px;padding:9px 12px;margin-bottom:8px}
+.wkname{font-size:17px;color:var(--hi);font-weight:700;line-height:1.2}
+.wkrem{font-family:var(--m);font-size:26px;color:var(--hi);font-weight:700;line-height:1.1;white-space:nowrap}
+#r-run.wkon .rbig{font-size:40px}
+#r-pre{padding:10px 14px 0;max-height:46%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#r-pre h2{font-size:17px;color:var(--hi)}
+.ral{position:absolute;z-index:3;left:10px;right:10px;top:54px;background:var(--glass);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.4;text-align:center}
+.rbtn:disabled{opacity:.45}
+@media (min-width:760px){#r-pre{grid-column:2;grid-row:2;align-self:center;padding:24px 20px 0;max-height:none}}
 .spin{animation:sp 1s linear infinite}
 /* blocos: cada título de seção e o que vem depois dele; no celular empilham, em tela larga viram colunas */
 .blk>.sec:first-child{margin-top:20px}.blk:first-child>.sec:first-child{margin-top:4px}
@@ -672,7 +681,8 @@ function rIni(){
     h+=`<div class="card cur"><div class="row" style="justify-content:space-between"><span class="lbl">${DOW[d.getDay()]} ${nx.date.slice(8)}/${nx.date.slice(5,7)} · ${tipoIc[nx.tipo]}</span>${tagSt[st]}</div><h2 style="margin-top:4px">${esc(nx.titulo)}</h2><div class="meta">${nx.km} km</div>${stepsHtml(nx)}
     ${adj?`<div class="coach"><b class="bad" style="color:var(--bad)">COACH // AJUSTE PROPOSTO</b>${esc(adj.why)}<div class="row" style="margin-top:8px"><button class="b sm pri" onclick="acceptAdj('${nx.date}')">Aceitar ajuste</button></div></div>`:''}
     ${hasWatch()?`<button class="b pri full" style="margin-top:10px" onclick="sendWatch('${nx.date}')">${st==='enviado'?'Reenviar ao relógio':'▲ Enviar ao relógio'}</button>`:''}
-    <div class="grid g2" style="margin-top:8px">${nx.date<=ds?`<button class="b ${hasWatch()?'':'pri'}" onclick="markDone('${nx.date}')">✓ Marcar feito</button>`:`<button class="b" onclick="openDay('${nx.date}')">Ver o dia</button>`}<button class="b" onclick="openBuilder('${nx.date}')">Editar treino</button></div></div>`}
+    <button class="b ${hasWatch()?'':'pri'} full" style="margin-top:8px" onclick="fazerTreino('${nx.date}')">▶ Fazer treino agora</button>
+    <div class="grid g2" style="margin-top:8px">${nx.date<=ds?`<button class="b" onclick="markDone('${nx.date}')">✓ Marcar feito</button>`:`<button class="b" onclick="openDay('${nx.date}')">Ver o dia</button>`}<button class="b" onclick="openBuilder('${nx.date}')">Editar treino</button></div></div>`}
   else if(PF)h+=`<div class="card cur"><h2>Plano concluído</h2><p class="empty" style="margin-top:4px">Os treinos deste ciclo acabaram. Responda o questionário de novo para montar o próximo com base no que você fez.</p><button class="b pri full" style="margin-top:10px" onclick="redoPlan()">Montar o próximo plano</button></div>`;
   else h+=`<div class="card"><p class="empty">Nenhuma atividade planejada.</p><button class="b full" style="margin-top:8px" onclick="openBuilder()">+ Criar treino</button></div>`;
   h+=`<div class="meta" style="text-align:center;margin-top:14px">${D.at?'Sincronizado '+new Date(D.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'Nunca sincronizado'}</div>`;
@@ -795,6 +805,7 @@ window.openDay=ds=>{
   const p=planOn(ds),ex=actsOn(ds),w=W(ds)||{},d=parseD(ds);
   let h=`<div class="hd"><b>${DOW[d.getDay()]} ${ds.split('-').reverse().join('/')}</b><button class="b sm" onclick="closeSheet()">✕</button></div>`;
   if(p)h+=`<div class="card cur"><div class="row" style="justify-content:space-between"><span class="lbl">PLANEJADO · ${tipoIc[p.tipo]}</span>${tagSt[status(p)]}</div><h2 style="margin-top:4px">${esc(p.titulo)}</h2><div class="meta">${p.km} km</div>${stepsHtml(p)}${p.why?`<div class="coach"><b>AJUSTE DO COACH</b>${esc(p.why)}</div>`:''}${ds>=ymd(TODAY())&&hasWatch()?`<button class="b pri full" style="margin-top:10px" onclick="sendWatch('${ds}')">▲ Enviar ao relógio</button>`:''}
+    ${ds>=ymd(TODAY())?`<button class="b ${hasWatch()?'':'pri'} full" style="margin-top:8px" onclick="fazerTreino('${ds}')">▶ Fazer treino agora</button>`:''}
     <div class="grid g2" style="margin-top:8px">${ds<=ymd(TODAY())&&status(p)!=='cumprido'?`<button class="b" onclick="markDone('${ds}')">✓ Marcar feito</button>`:''}${ds>=ymd(TODAY())?`<button class="b" onclick="openBuilder('${ds}')">Editar treino</button>`:''}</div></div>`;
   ex.forEach(a=>h+=`<div class="card" onclick="openAct('${a.id}')"><div class="row" style="justify-content:space-between"><span class="lbl">EXECUTADO · ${typeIc(a)}</span>${a.src==='MANUAL'?'<span class="tag">MARCADO À MÃO</span>':''}</div><h2 style="margin-top:4px">${esc(a.name)}</h2><div class="meta">${a.dist?km(a.dist)+' km · ':''}${fmtT(a.mov)}${isRun(a)&&a.dist?' · '+fmtP(a.mov/a.dist*1000)+'/km':''}${a.hr?' · '+a.hr+' bpm':''}</div>${isMan(a)?`<button class="b sm" style="margin-top:8px" onclick="event.stopPropagation();undoMan('${a.id}')">Desfazer</button>`:''}</div>`);
   if(!p&&!ex.length)h+=`<p class="empty">Dia de descanso.</p>`;
@@ -1396,27 +1407,120 @@ window.resetFoto=()=>{LS.set('foto',null);render()};
 /* ================= gravar corrida (GPS do celular) ================= */
 // para quem não tem relógio: grava pelo celular e manda ao Intervals como arquivo GPX (pausas viram trechos separados)
 // pontos: [hora ms, lat, lon, altitude, trecho]
-let REC=LS.get('rec',null),RM=null,RWID=null,RTK=null,WL=null,FIX=null;
+let REC=LS.get('rec',null),RM=null,RWID=null,RTK=null,WL=null,FIX=null,RSEL={p:null,modo:'livre'};
+// diagnóstico do GPS de cada gravação: pontos válidos e descartados, maior tempo sem sinal, vezes que o app saiu da tela
+const gNovo=()=>({ok:0,fraco:0,salto:0,rej:0,max:0,lp:0,hid:0,ocN:0,ocMs:0,ult:0,avisa:0,perdeu:0});
+if(REC&&!REC.g)REC.g=gNovo();
 const hav=(a,b)=>{const r=Math.PI/180,x=Math.sin((b[0]-a[0])*r/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin((b[1]-a[1])*r/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
 const recLive=()=>!!REC&&REC.st!=='idle';
 const recMov=()=>REC?(REC.mov+(REC.st==='run'?Date.now()-REC.since:0))/1000:0;
 const recKeep=()=>LS.set('rec',REC);
 const isoLocal=ms=>{const d=new Date(ms);return ymd(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())};
 const locMsg=()=>/iPhone|iPad/.test(navigator.userAgent)?'PERMITA A LOCALIZAÇÃO NOS AJUSTES DO IPHONE':'PERMITA A LOCALIZAÇÃO NO NAVEGADOR';
-const say=t=>{if(!LS.get('voz',1)||!window.speechSynthesis)return;try{const u=new SpeechSynthesisUtterance(t);u.lang='pt-BR';u.rate=1.05;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}};
-const paceVoz=s=>{s=Math.round(s);return Math.floor(s/60)+' e '+(s%60)};
+const say=t=>{if(!LS.get('voz',1)||!window.speechSynthesis)return;try{if(speechSynthesis.pending)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='pt-BR';u.rate=1.05;speechSynthesis.speak(u)}catch(e){}};
+const paceVoz=s=>{s=Math.round(s);return Math.floor(s/60)+(s%60?' e '+(s%60):' em ponto')};
 async function wake(on){try{if(on&&!WL&&navigator.wakeLock){WL=await navigator.wakeLock.request('screen');WL.addEventListener('release',()=>{WL=null})}else if(!on&&WL){await WL.release();WL=null}}catch(e){}}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&recLive())wake(1)});
+// o iPhone para o GPS de um app quando ele sai da tela: anota quanto tempo ficou fora
+document.addEventListener('visibilitychange',()=>{
+  if(!recLive())return;const g=REC.g;
+  if(document.visibilityState==='hidden'){if(REC.st==='run'&&!g.hid){g.hid=Date.now();recKeep()}}
+  else{wake(1);if(g.hid){const ms=Date.now()-g.hid;g.hid=0;if(ms>3000){g.ocN++;g.ocMs+=ms;g.ult=ms;g.avisa=Date.now()+25000;say('O app ficou fora da tela. O GPS pode ter parado.')}recKeep()}}
+});
+/* treino guiado: o plano do dia vira uma lista de etapas (com as repetições abertas) que o app vai cumprindo pela distância ou pelo tempo */
+const nomeE=e=>({'Rec.':'Recuperação','Aquecer':'Aquecimento','Desaquecer':'Desaquecimento'}[e.nome]||e.nome);
+const fmtN=x=>String(Math.round(x*10)/10).replace('.',',');
+const qtd=(e,voz)=>e.m?(e.m>=1000?fmtN(e.m/1000)+(voz?(e.m===1000?' quilômetro':' quilômetros'):' km'):Math.round(e.m)+(voz?' metros':' m')):(e.s>=60?fmtN(e.s/60)+(voz?(e.s===60?' minuto':' minutos'):' min'):Math.round(e.s)+(voz?' segundos':' s'));
+function flatSteps(p){
+  const mk=(s,r,n)=>{const m=/^([\d.]+)(km|m|min)$/.exec(s[1])||[],v=parseFloat(m[1])||0,u=m[2];return {nome:s[0],r,n,m:u==='km'?v*1000:u==='m'?v:0,s:u==='min'?v*60:0,pace:s[2]||null}};
+  const st=p.steps,out=[];let i=0;
+  while(i<st.length){const s=st[i];
+    if(s[3]&&st[i+1]&&st[i+1][3]===s[3]){for(let r=1;r<=s[3];r++){out.push(mk(s,r,s[3]));out.push(mk(st[i+1],r,s[3]))}i+=2}
+    else if(s[3]){for(let r=1;r<=s[3];r++)out.push(mk(s,r,s[3]));i++}
+    else{out.push(mk(s,0,0));i++}}
+  return out.filter(e=>e.m>0||e.s>0);
+}
+function wkSay(){
+  const w=REC&&REC.wk;if(!w)return;
+  if(w.i>=w.steps.length)return say('Treino concluído. Pode desacelerar e finalizar quando quiser.');
+  const e=w.steps[w.i];
+  say(`${nomeE(e)}${e.n?' '+e.r+' de '+e.n:''}. ${qtd(e,1)}${e.pace&&e.r<=1?'. Ritmo '+paceVoz((e.pace[0]+e.pace[1])/2):''}`);
+}
+function wkNext(manual){
+  const w=REC.wk,e=w.steps[w.i],now=recMov(),dd=REC.dist-w.d0,tt=now-w.t0;
+  w.laps.push({nome:e.nome,r:e.r,n:e.n,dist:Math.round(!manual&&e.m?e.m:dd),t:Math.round(!manual&&e.s?e.s:tt)});
+  // etapa por distância: a sobra de metros passa para a próxima; por tempo: a sobra de segundos
+  if(manual){w.d0=REC.dist;w.t0=now}else if(e.m){w.d0+=e.m;w.t0=now}else{w.t0+=e.s;w.d0=REC.dist}
+  w.i++;w.av=0;recKeep();wkSay();
+}
+function wkStep(){
+  const w=REC&&REC.wk;if(!w||REC.st!=='run')return;
+  for(let k=0;k<30&&w.i<w.steps.length;k++){
+    const e=w.steps[w.i],dd=REC.dist-w.d0,tt=recMov()-w.t0;
+    if(e.m?dd>=e.m:tt>=e.s){wkNext(false);continue}
+    if(e.m>=500&&e.m-dd<=100&&!w.av){w.av=1;say('Faltam 100 metros')}
+    break;
+  }
+}
+window.recSkip=()=>{if(REC&&REC.wk&&REC.wk.i<REC.wk.steps.length&&REC.st==='run'){wkNext(true);recUI()}};
+function wkUI(){
+  const el=$('#r-wk'),w=REC&&REC.wk;if(!el)return;
+  $('#r-run').classList.toggle('wkon',!!w);
+  if(!w){el.innerHTML='';return}
+  if(w.i>=w.steps.length){el.innerHTML='<div class="etp"><div class="lbl ok">✓ TREINO CONCLUÍDO</div><p class="empty" style="margin-top:4px">Pode desacelerar e tocar em Finalizar quando quiser.</p></div>';return}
+  const e=w.steps[w.i],nx=w.steps[w.i+1],dd=REC.dist-w.d0,tt=recMov()-w.t0,cp=curPace();
+  const rem=e.m?Math.max(0,e.m-dd):Math.max(0,e.s-tt),prog=clamp(e.m?dd/e.m:tt/e.s,0,1);
+  const remTxt=e.m?(rem>=1000?(rem/1000).toFixed(2).replace('.',',')+' km':Math.round(rem)+' m'):fmtT(rem);
+  let alvo='Ritmo livre';
+  if(e.pace){const lo=Math.min(...e.pace),hi=Math.max(...e.pace);alvo=`Meta ${fmtP(lo)}–${fmtP(hi)}/km`;
+    if(cp)alvo+=cp<lo-3?' · <span class="warn">mais rápido que a meta</span>':cp>hi+3?' · <span class="warn">mais lento que a meta</span>':' · <span class="ok">no ritmo</span>'}
+  el.innerHTML=`<div class="etp"><div class="row" style="justify-content:space-between;flex-wrap:nowrap"><span class="lbl">ETAPA ${w.i+1} DE ${w.steps.length}</span>${e.n?`<span class="tag ok">${e.r} / ${e.n}</span>`:''}</div>
+    <div class="row" style="justify-content:space-between;align-items:baseline;flex-wrap:nowrap;margin-top:2px"><span class="wkname">${esc(nomeE(e))} · ${qtd(e)}</span><span class="wkrem">${remTxt}</span></div>
+    <div class="bar"><i style="width:${prog*100}%"></i></div><div class="meta" style="margin-top:5px">${alvo}</div>
+    <div class="meta">${nx?'Depois: '+esc(nomeE(nx))+' · '+qtd(nx):'Última etapa'}</div></div>`;
+}
+// treino de outro dia feito hoje: o treino muda para hoje
+function moveToToday(ds){
+  const hoje=ymd(TODAY()),p=planOn(ds),ex=LS.get('extra',{}),ov=LS.get('ov',{}),c={...p,date:hoje};delete c.adjusted;
+  bClear(ex,ds);ex[hoje]=c;delete ov[hoje];LS.set('extra',ex);LS.set('ov',ov);
+}
+window.fazerTreino=ds=>{
+  const p=planOn(ds),hoje=ymd(TODAY());if(!p)return;closeSheet();
+  if(ds!==hoje){
+    const o=planOn(hoje);
+    if(!confirm(`Esse treino é de ${DOW[parseD(ds).getDay()]} ${fmtD(ds)}. Fazer hoje e mover o treino para hoje?${o?'\n\nO treino de hoje ('+o.titulo+') será trocado.':''}`))return;
+    moveToToday(ds);
+  }
+  openRec(hoje);
+};
+window.rsel=m=>{RSEL.modo=m;prePaint();recUI()};
+function prePaint(){
+  const el=$('#r-pre');if(!el)return;const p=RSEL.p,tr=RSEL.modo==='treino'&&p;
+  el.innerHTML=(p?`<div class="row" style="justify-content:space-between"><span class="lbl">TREINO DE HOJE</span>${tagSt[status(p)]}</div><h2 style="margin-top:2px">${esc(p.titulo)}</h2><div class="meta">${kmTxt(p.km)} km</div>${stepsHtml(p)}
+    <div class="seg" style="margin:10px 0 0"><button class="${tr?'on':''}" onclick="rsel('treino')">TREINO GUIADO</button><button class="${tr?'':'on'}" onclick="rsel('livre')">CORRIDA LIVRE</button></div>`
+    :`<div class="lbl">CORRIDA LIVRE</div><p class="empty" style="margin-top:4px">Hoje não há treino planejado. Toque em Iniciar para gravar uma corrida livre.</p>`)
+    +(GUIA!=null?`<div class="meta" style="margin-top:8px">Rota guia: ${esc(ROTAS[GUIA].nome)}</div>`:'')
+    +`<div id="r-gatew" style="margin-top:10px"><p class="empty" id="r-gate"></p><button class="b sm" id="r-force" style="margin-top:6px" onclick="recGo(1)">Iniciar sem esperar o GPS</button></div>
+    <p class="empty" style="margin-top:8px">Para o GPS não parar: deixe a tela ligada e não troque de app. No iPhone: Ajustes › Tela e Brilho › Bloqueio Automático › Nunca.</p>`;
+}
 function onPos(p){
-  const c=p.coords;FIX={acc:c.accuracy,ll:[c.latitude,c.longitude],t:Date.now()};
-  if(REC&&REC.st==='run'&&c.accuracy<=35){
-    const q=[p.timestamp||Date.now(),+c.latitude.toFixed(6),+c.longitude.toFixed(6),c.altitude!=null?Math.round(c.altitude*10)/10:null,REC.seg],L=REC.pts[REC.pts.length-1];
-    let ok=true;
-    if(L&&L[4]===q[4]){const d=hav([L[1],L[2]],[q[1],q[2]]),dt=(q[0]-L[0])/1000;
-      if(dt<=0||d/dt>12)ok=false; // salto de GPS
-      else if(d<4&&dt<5)ok=false; // parado no lugar: não repete ponto
-      else{const b=REC.dist;REC.dist+=d;if(Math.floor(REC.dist/1000)>Math.floor(b/1000)){const k=Math.floor(REC.dist/1000),t=recMov(),sp=t-REC.splits.reduce((s,x)=>s+x,0);REC.splits.push(sp);say(`${k} ${k>1?'quilômetros':'quilômetro'}. Ritmo ${paceVoz(sp)}.`)}}}
-    if(ok){REC.pts.push(q);recKeep()}
+  const c=p.coords,now=Date.now();FIX={acc:c.accuracy,ll:[c.latitude,c.longitude],t:now};
+  if(REC&&REC.st==='run'){
+    const g=REC.g,ts=p.timestamp||now;
+    if(g.lp){const gap=Math.round((ts-g.lp)/1000);if(gap>g.max)g.max=gap}g.lp=ts;
+    if(g.perdeu){g.perdeu=0;say('GPS de volta.')}
+    if(c.accuracy>35)g.fraco++;
+    else{
+      const q=[ts,+c.latitude.toFixed(6),+c.longitude.toFixed(6),c.altitude!=null?Math.round(c.altitude*10)/10:null,REC.seg],L=REC.pts[REC.pts.length-1];
+      let ok=true;
+      if(L&&L[4]===q[4]){const d=hav([L[1],L[2]],[q[1],q[2]]),dt=(q[0]-L[0])/1000;
+        if(dt<=0||d/dt>12){ // salto de GPS; se 3 pontos seguidos "saltam", o ponto antigo é que estava errado: recomeça o trecho daqui
+          g.salto++;g.rej++;if(g.rej>=3){REC.seg++;q[4]=REC.seg;g.rej=0}else ok=false}
+        else{g.rej=0;
+          if(d<4&&dt<5)ok=false; // parado no lugar: não repete ponto
+          else{const b=REC.dist;REC.dist+=d;if(Math.floor(REC.dist/1000)>Math.floor(b/1000)){const k=Math.floor(REC.dist/1000),t=recMov(),sp=t-REC.splits.reduce((s,x)=>s+x,0);REC.splits.push(sp);say(`${k} ${k>1?'quilômetros':'quilômetro'}. Ritmo ${paceVoz(sp)}.`)}}}}
+      if(ok){REC.pts.push(q);g.ok++;recKeep()}
+    }
+    wkStep();
   }
   recDraw();recUI();
 }
@@ -1431,15 +1535,32 @@ function curPace(){const P=REC&&REC.pts,n=P?P.length:0;if(n<2||REC.st!=='run'||D
 function recUI(){
   const fb=$('#recfab-t');if(fb)fb.textContent=REC?fmtT(recMov()):'';
   if(!$('#rec').classList.contains('on'))return;
-  const st=REC?REC.st:'idle',t=recMov(),d=REC?REC.dist:0,done=REC?REC.splits.reduce((s,x)=>s+x,0):0;
+  const st=REC?REC.st:'idle',idle=st==='idle',t=recMov(),d=REC?REC.dist:0,done=REC?REC.splits.reduce((s,x)=>s+x,0):0,now=Date.now();
+  if(REC&&st==='run')wkStep();
+  $('#r-pre').style.display=idle?'':'none';$('#r-run').style.display=idle?'none':'';
   $('#r-t').textContent=fmtT(t);$('#r-d').innerHTML=(d/1000).toFixed(2)+'<small> km</small>';
   $('#r-pa').innerHTML=fmtP(curPace())+'<small>/km</small>';$('#r-pm').innerHTML=(d>50?fmtP(t/d*1000):'--')+'<small>/km</small>';
   const kd=d%1000;$('#r-pk').innerHTML=(kd>50?fmtP((t-done)/kd*1000):'--')+`<small> km ${Math.floor(d/1000)+1}</small>`;
   $('#r-gps').innerHTML=!FIX?'<span class="warn">PROCURANDO GPS…</span>':FIX.acc<=12?'<span class="ok">GPS ÓTIMO</span>':FIX.acc<=30?'<span class="ok">GPS BOM</span>':'<span class="bad">GPS FRACO</span>';
-  $('#r-min').textContent=st==='idle'?'✕':'⌄';
-  const want=st==='idle'?'i':st;if($('#r-ctl').dataset.st!==want){$('#r-ctl').dataset.st=want;
-    $('#r-ctl').innerHTML=st==='idle'?`<button class="rbtn" onclick="recGo()">INICIAR</button>`:st==='run'?`<button class="rbtn amb" onclick="recPause()">PAUSAR</button>`:`<button class="rbtn" onclick="recGo()">CONTINUAR</button><button class="rbtn red" onclick="recEnd()">FINALIZAR</button>`}
+  $('#r-min').textContent=idle?'✕':'⌄';
   $('#r-st').textContent=st==='pause'?'PAUSADO':st==='run'?'GRAVANDO':'';
+  // avisos: sem sinal, ou app que saiu da tela
+  let msg='';
+  if(REC&&st==='run'){const g=REC.g,age=(now-(FIX?FIX.t:REC.since))/1000;
+    if(age>10){msg=`<span class="bad">SEM SINAL DE GPS HÁ ${Math.round(age)} s</span>`;if(age>15&&!g.perdeu){g.perdeu=1;say('GPS perdido.')}}
+    else if(g.avisa>now)msg=`<span class="warn">O app ficou fora da tela por ${fmtT(g.ult/1000)}. O GPS parou nesse trecho.</span>`}
+  const al=$('#r-al');al.innerHTML=msg;al.style.display=msg?'block':'none';
+  wkUI();
+  // antes de iniciar: só libera quando o GPS estiver bom (como no relógio)
+  if(idle){const ok=!!FIX&&FIX.acc<=30&&now-FIX.t<8000,cat=ok?'ok':!FIX?'busca':'fraco',go=$('#r-go'),gt=$('#r-gate'),fo=$('#r-force');
+    if(go){go.disabled=!ok;go.textContent=ok?'INICIAR':'GPS…'}
+    if(fo)fo.style.display=ok?'none':'';
+    if(gt&&gt.dataset.c!==cat){gt.dataset.c=cat;gt.innerHTML=cat==='ok'?'<span class="ok">✓ GPS pronto. Pode começar.</span>':cat==='busca'?'<span class="warn">Procurando o sinal de GPS. Fique em um lugar aberto…</span>':'<span class="warn">Sinal de GPS fraco. Espere ficar verde antes de começar.</span>'}}
+  const want=idle?'i':st+(REC&&REC.wk?'w':'');
+  if($('#r-ctl').dataset.st!==want){$('#r-ctl').dataset.st=want;
+    $('#r-ctl').innerHTML=idle?`<button class="rbtn" id="r-go" onclick="recGo()" disabled>GPS…</button>`
+      :st==='run'?`<button class="rbtn amb" onclick="recPause()">PAUSAR</button>${REC.wk?`<button class="rbtn" onclick="recSkip()">PULAR<br>ETAPA</button>`:''}`
+      :`<button class="rbtn" onclick="recGo()">CONTINUAR</button><button class="rbtn red" onclick="recEnd()">FINALIZAR</button>`}
 }
 function recDraw(){
   if(!RM||!RM.getSource('rt'))return;
@@ -1448,15 +1569,19 @@ function recDraw(){
   if(FIX){const c=[FIX.ll[1],FIX.ll[0]];RM.getSource('me').setData({type:'Feature',geometry:{type:'Point',coordinates:c}});
     if(!RM._fixou){RM.jumpTo({center:c,zoom:16});RM._fixou=1}else if(recLive())RM.easeTo({center:c,duration:600})}
 }
-window.openRec=()=>{
+window.openRec=d=>{
   if(!CFG.key)return toast('CONECTE O INTERVALS EM MAIS');
+  if(typeof d!=='string')d=null; // o botão vermelho chama sem data
   const el=$('#rec');
-  if(!el.innerHTML){const p=planOn(ymd(TODAY()));
+  if(!recLive()){const p=planOn(d||ymd(TODAY()));RSEL={p,modo:p&&status(p)!=='cumprido'?'treino':'livre'}}
+  if(!el.innerHTML){
     el.innerHTML=`<div class="rtop"><button class="b sm" id="r-min" onclick="closeRec()" aria-label="Fechar">✕</button><div style="text-align:center"><b style="font-size:12px;letter-spacing:.14em;color:var(--amber)">GRAVAR CORRIDA</b><div class="meta" id="r-gps"></div></div><button class="b sm" id="r-voz" onclick="togVoz()" aria-label="Voz"></button></div>
-    <div id="rmap"><span class="chip" id="r-st" style="position:absolute;z-index:2;left:10px;top:10px;color:var(--red);border-color:var(--red)"></span></div>
-    <div class="rmet"><div class="meta" style="text-align:center;min-height:14px">${GUIA!=null?'Rota: '+esc(ROTAS[GUIA].nome)+' · '+(ROTAS[GUIA].dist/1000).toFixed(1).replace('.',',')+' km':p?'Treino de hoje: '+esc(p.titulo):''}</div><div class="rbig" id="r-t">0:00</div><div class="lbl" style="text-align:center;margin-top:3px">TEMPO EM MOVIMENTO</div>
+    <div id="rmap"><span class="chip" id="r-st" style="position:absolute;z-index:2;left:10px;top:10px;color:var(--red);border-color:var(--red)"></span><div class="ral" id="r-al" style="display:none"></div></div>
+    <div id="r-pre"></div>
+    <div class="rmet" id="r-run" style="display:none"><div class="meta" style="text-align:center;min-height:14px">${GUIA!=null?'Rota: '+esc(ROTAS[GUIA].nome)+' · '+(ROTAS[GUIA].dist/1000).toFixed(1).replace('.',',')+' km':''}</div><div id="r-wk"></div><div class="rbig" id="r-t">0:00</div><div class="lbl" style="text-align:center;margin-top:3px">TEMPO EM MOVIMENTO</div>
     <div class="grid g2" style="margin-top:12px"><div class="cell"><div class="lbl">Distância</div><span class="num big" id="r-d"></span></div><div class="cell"><div class="lbl">Ritmo atual</div><span class="num big" id="r-pa"></span></div><div class="cell"><div class="lbl">Ritmo médio</div><span class="num" id="r-pm"></span></div><div class="cell"><div class="lbl">Km atual</div><span class="num" id="r-pk"></span></div></div></div>
     <div class="rctl" id="r-ctl"></div>`}
+  prePaint();
   $('#r-voz').textContent=LS.get('voz',1)?'🔊':'🔇';
   el.classList.add('on');$('#recfab').classList.remove('on');recWatch(1);
   clearInterval(RTK);RTK=setInterval(recUI,1000);recUI();
@@ -1477,8 +1602,14 @@ window.openRec=()=>{
 };
 window.closeRec=()=>{$('#rec').classList.remove('on');if(!recLive()){recWatch(0);clearInterval(RTK);RTK=null}render()};
 window.togVoz=()=>{LS.set('voz',LS.get('voz',1)?0:1);$('#r-voz').textContent=LS.get('voz',1)?'🔊':'🔇'};
-window.recGo=()=>{
-  if(!REC||REC.st==='idle'){REC={st:'run',seg:0,pts:[],dist:0,mov:0,since:Date.now(),splits:[],t0:Date.now()};say('Gravação iniciada. Bom treino.')}
+window.recGo=force=>{
+  if(!REC||REC.st==='idle'){
+    if(force!==1&&!(FIX&&FIX.acc<=30&&Date.now()-FIX.t<8000))return toast('AGUARDE O GPS FICAR VERDE');
+    const p=RSEL.modo==='treino'?RSEL.p:null;
+    REC={st:'run',seg:0,pts:[],dist:0,mov:0,since:Date.now(),splits:[],t0:Date.now(),g:gNovo(),wk:p?{t:p.titulo,steps:flatSteps(p),i:0,d0:0,t0:0,laps:[]}:null};
+    if(REC.wk&&!REC.wk.steps.length)REC.wk=null;
+    say('Gravação iniciada. Bom treino.');if(REC.wk)setTimeout(wkSay,2200);
+  }
   else if(REC.st==='pause'){REC.st='run';REC.since=Date.now();REC.seg++;say('Continuando.')}
   recKeep();wake(1);recUI();
 };
@@ -1487,11 +1618,18 @@ function recStats(){const P=REC.pts,t0=P.length?P[0][0]:REC.t0,t=[],d=[];let c=0
 window.recEnd=()=>{
   if(REC.st==='run')recPause();
   if(REC.dist<50&&!confirm('A corrida tem menos de 50 m. Finalizar mesmo assim?'))return;
-  const mv=recMov(),p=planOn(ymd(TODAY()));
+  const mv=recMov(),w=REC.wk,g=REC.g||{},laps=w?[...w.laps]:[];
+  if(w&&w.i<w.steps.length){const e=w.steps[w.i],dd=REC.dist-w.d0,tt=mv-w.t0;if(dd>20||tt>10)laps.push({nome:e.nome,r:e.r,n:e.n,dist:Math.round(dd),t:Math.round(tt),parcial:1})}
+  const ruim=!!(g.ocN||g.max>=20||g.fraco>Math.max(10,(g.ok||0)*.3));
+  const itens=[(g.ok||0)+' pontos válidos'];
+  if(g.fraco)itens.push(g.fraco+' descartados por sinal fraco');if(g.salto)itens.push(g.salto+' por salto de posição');
+  if(g.max>=10)itens.push('maior tempo sem sinal: '+g.max+' s');if(g.ocN)itens.push('app fora da tela '+g.ocN+'× ('+fmtT(g.ocMs/1000)+')');
   openSheet(`<div class="hd"><b>CORRIDA FINALIZADA</b><button class="b sm" onclick="closeSheet()">✕</button></div>
   <div class="grid g3"><div class="cell"><div class="lbl">Distância</div><span class="num">${km(REC.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(mv)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${REC.dist>50?fmtP(mv/REC.dist*1000):'--'}</span></div></div>
+  ${w?`<div class="sec">TREINO<small>${w.laps.length} DE ${w.steps.length} ETAPAS</small></div><table><tr><th>Etapa</th><th class="r">Dist.</th><th class="r">Tempo</th><th class="r">Ritmo</th></tr>${laps.map(l=>`<tr><td style="font-family:var(--f)">${esc(nomeE(l))}${l.n?' '+l.r+'/'+l.n:''}${l.parcial?' (parcial)':''}</td><td class="r">${l.dist>=1000?kmTxt((l.dist/1000).toFixed(2)):l.dist+' m'}</td><td class="r">${fmtT(l.t)}</td><td class="r">${l.dist>50?fmtP(l.t/l.dist*1000):'--'}</td></tr>`).join('')}</table>`:''}
   ${REC.splits.length?`<div class="sec">PARCIAIS</div><table><tr><th>KM</th><th class="r">Ritmo</th></tr>${REC.splits.map((s,i)=>`<tr><td>${i+1}</td><td class="r">${fmtP(s)}</td></tr>`).join('')}</table>`:''}
-  <label class="f">Nome da corrida</label><input id="r-nome" value="${esc(p?p.titulo:'Corrida')}">
+  <div class="card ${ruim?'alert':''}" style="margin-top:12px"><div class="lbl ${ruim?'bad':''}">QUALIDADE DO GPS</div><p class="empty" style="margin-top:4px">${itens.join(' · ')}.</p>${ruim?'<p class="empty" style="margin-top:6px;color:var(--txt)">O GPS falhou em parte da corrida, então a distância pode estar menor que a real. Nas próximas, deixe a tela ligada e não troque de app.</p>':''}</div>
+  <label class="f">Nome da corrida</label><input id="r-nome" value="${esc(w?w.t:'Corrida')}">
   <button class="b pri full" style="margin-top:14px" onclick="recSave()">Salvar</button>
   <div class="grid g2" style="margin-top:8px"><button class="b" onclick="closeSheet()">Voltar a gravar</button><button class="b red" onclick="recTrash()">Descartar</button></div>`);
 };
@@ -1522,7 +1660,8 @@ window.resendGpx=async id=>{
   try{await upGpx(a.name,gpx);MAN=MAN.filter(m=>m.id!==id);LS.set('man',MAN);LS.set('gpx.'+id,null);D.acts=withMan(D.acts);LS.set('data',D);closeSheet();toast('ENVIADA AO INTERVALS',3000);setTimeout(()=>sync(0),5000)}
   catch(e){toast('AINDA NÃO DEU // '+e.message,3500)}
 };
-if(recLive()){recWatch(1);RTK=setInterval(recUI,1000)}
+if(recLive()){recWatch(1);RTK=setInterval(recUI,1000);
+  const g=REC.g;if(g.hid){const ms=Date.now()-g.hid;g.hid=0;if(ms>3000){g.ocN++;g.ocMs+=ms;g.ult=ms;g.avisa=Date.now()+25000}recKeep()}}
 
 /* ================= tema claro (gelo) e escuro ================= */
 const SOL='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>';
