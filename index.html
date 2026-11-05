@@ -167,6 +167,7 @@ svg.ch{width:100%;display:block}
 .cbar{position:absolute;z-index:3;top:10px;left:10px;right:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none}.cbar .cr{display:flex;justify-content:space-between;align-items:center;gap:6px;pointer-events:none}.cbar .cr>*{pointer-events:auto}.cbar .seg{background:var(--glass)}
 .bd{display:inline-block;min-width:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:var(--blue);color:#000;font-size:10px;line-height:16px;text-align:center}
 .ck{width:24px;height:24px;flex:none;border:2px solid var(--dim);border-radius:6px;display:grid;place-items:center;color:#000;font-weight:700;font-size:15px;margin-top:1px}.ck.on{background:var(--blue);border-color:var(--blue)}
+.cartbg{border-radius:8px;overflow:hidden;border:1px solid var(--line)}.cartbg.dark{background:conic-gradient(#3a3f46 25%,#2b3036 0 50%,#3a3f46 0 75%,#2b3036 0) 0 0/24px 24px}.cartbg.light{background:conic-gradient(#e4e8ec 25%,#cfd5db 0 50%,#e4e8ec 0 75%,#cfd5db 0) 0 0/24px 24px}
 .pin{width:40px;height:40px;border-radius:50%;border:3px solid var(--blue);padding:0;background:var(--bg);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.45);cursor:pointer}.pin img{width:100%;height:100%;object-fit:cover;display:block}
 .chip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:18px;background:var(--glass);border:1px solid var(--line);color:var(--txt);font-size:10px;letter-spacing:.1em;white-space:nowrap}.chip.b{color:var(--blue);border-color:var(--blue);min-width:0}
 .fab{position:absolute;z-index:3;right:12px;bottom:40px;width:50px;height:50px;border-radius:50%;background:var(--glass);border:1px solid var(--blue);color:var(--blue);font-size:22px;line-height:1;padding:0}
@@ -708,6 +709,9 @@ const typeIc=a=>isRun(a)?'RUN':/Walk|Hike/.test(a.type)?'MCH':/Swim/.test(a.type
 const qb=k=>`<button class="q" onclick="help('${k}')" aria-label="O que é isso?">?</button>`;
 const sgn=v=>{const x=Math.round(v*10)/10||0;return (x>0?'+':'')+x.toFixed(1)};
 const tsbTxt=t=>t>5?'Descansado: bom momento para um treino forte ou uma prova.':t>=-10?'Equilibrado: treino e descanso em dia.':t>=-30?'Carga alta: o corpo está se adaptando. Capriche no sono.':'Carga muito alta: risco de exagero. Priorize o descanso.';
+// modo simples: esconde disposição, forma/fadiga, vitais e métricas avançadas; começa ligado para iniciantes
+const SIMPLES=()=>{const v=LS.get('simples',null);if(v!=null)return !!v;return !isIgor()&&!!PF&&(PF.km0||0)<10};
+window.setSimples=v=>{LS.set('simples',v?1:0);toast(v?'MODO SIMPLES':'MODO COMPLETO');render()};
 function rIni(){
   const el=$('#ini');
   if(!CFG.key){el.innerHTML=`<div class="sec">CONFIGURAÇÃO</div><div class="card alert"><h2>Sem conexão com o Intervals.icu</h2><p class="empty">Abra MAIS → Conexão e cole o Athlete ID e a chave de API.</p></div>`;return}
@@ -719,21 +723,27 @@ function rIni(){
   // resultado do teste de 1 km ainda não aplicado
   const tf=testeAchado(),tk=tf&&tf.d/1000;
   if(tf)h+=`<div class="card cur"><div class="lbl" style="color:var(--blue)">TESTE DE ${tk} KM</div>${tf.t?`<h2 style="margin-top:4px">Seu ${tk} km: ${fmtT(tf.t)}</h2><p class="empty" style="margin-top:4px">Use o resultado para ajustar os ritmos dos seus treinos.</p><button class="b sm pri" style="margin-top:8px" onclick="abrirTeste('${tf.date}',${tf.t},${tf.d})">Ver novos ritmos</button>`:`<p class="empty" style="margin-top:4px">Você fez o teste de ${fmtD(tf.date)}. Informe o tempo dos ${tk} km para ajustar os ritmos dos seus treinos.</p><button class="b sm pri" style="margin-top:8px" onclick="abrirTeste('${tf.date}',null,${tf.d})">Informar o tempo</button>`}</div>`;
+  if(SIMPLES()&&!LS.get('simplesConv')&&D.acts.filter(isRun).length>=5)h+=`<div class="card cur"><div class="lbl" style="color:var(--blue)">QUER VER MAIS DETALHES?</div><p class="empty" style="margin-top:4px">Você já fez ${D.acts.filter(isRun).length} corridas. O app tem mais números, como forma, fadiga e sono, para quem quer entender o treino a fundo. Dá para mudar quando quiser, em Mais.</p><div class="row" style="margin-top:8px"><button class="b sm pri" onclick="setSimples(0)">Mostrar tudo</button><button class="b sm" onclick="LS.set('simplesConv',1);render()">Agora não</button></div></div>`;
+  const mU=h.length;
   // último treino
   h+=`<div class="sec">ÚLTIMO TREINO<small>${last?DOW[parseD(last.date).getDay()]+' '+last.date.slice(8,10)+'/'+last.date.slice(5,7):''}</small></div>`;
   if(last){const pace=last.mov/last.dist*1000;
     h+=`<div class="card cur" onclick="openAct('${last.id}')"><h2>${esc(last.name)}</h2><div class="meta">${last.date.slice(11,16)} · ${fmtT(last.mov)} em movimento</div>${(AX[last.id]||{}).map?mapBox(last.id,170):''}
     <div class="grid g4" style="margin-top:10px"><div class="cell"><div class="lbl">Dist.</div><span class="num">${km(last.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${fmtP(pace)}<small>/km</small></span></div><div class="cell"><div class="lbl">FC méd/máx</div><span class="num">${last.hr||'--'}<small>/${last.hrmax||'--'}</small></span></div><div class="cell"><div class="lbl">Esforço</div><span class="num">${last.rpe?last.rpe+'<small>/10</small>':Math.round(loadOf(last))+'<small> carga</small>'}</span></div></div></div>`}
   else h+=`<div class="card"><p class="empty">Nenhuma corrida registrada ainda.</p></div>`;
+  const mD=h.length;
   // disposição
   h+=`<div class="sec"><span>DISPOSIÇÃO${qb('disp')}</span><small>HOJE</small></div><div class="card ${r.cls==='bad'?'alert':''}"><div class="ring">${ringSvg(r.sc,r.cls)}<div style="flex:1"><div class="lbl">Hoje está</div><div class="num big ${r.cls}">${r.st}</div>
     ${r.parts.map(p=>`<div class="row" style="justify-content:space-between;margin-top:4px;font-size:11px"><span class="dim">${p[0]}</span><span class="num" style="font-size:11px">${p[1]}</span></div><div class="bar ${p[2]<.5?'red':''}" style="margin-top:2px;height:3px"><i style="width:${p[2]*100}%"></i></div>`).join('')}</div></div>
     <div class="lbl" style="margin-top:12px">Como você acordou?</div><div class="feel" style="margin-top:5px">${[1,2,3,4,5].map(n=>`<button class="${(LS.get('ck',{})[ds])===n?'on':''}" onclick="checkin(${n})">${n}</button>`).join('')}</div>
     <div class="row meta" style="justify-content:space-between;margin-top:3px"><span>destruído</span><span>100%</span></div></div>`;
+  const mC=h.length;
   // condição
   h+=`<div class="sec"><span>CONDIÇÃO ATUAL${qb('carga')}</span><small>TREINO × DESCANSO</small></div><div class="card"><div class="grid g3"><div class="cell"><div class="lbl">Forma</div><span class="num ok">${cur.ctl.toFixed(1)}</span><div class="meta">CTL</div></div><div class="cell"><div class="lbl">Fadiga</div><span class="num bad">${cur.atl.toFixed(1)}</span><div class="meta">ATL</div></div><div class="cell"><div class="lbl">Equilíbrio</div><span class="num ${cur.tsb<-30?'bad':cur.tsb<-10?'warn':'ok'}">${sgn(cur.tsb)}</span><div class="meta">TSB</div></div></div><div style="margin-top:10px">${pmcSvg(S)}</div><p class="empty" style="margin-top:8px">${tsbTxt(cur.tsb)}</p></div>`;
+  const mV=h.length;
   // vitais (abrem o detalhe)
   h+=`<div class="sec">VITAIS<small>TOQUE PARA VER MAIS</small></div><div class="grid g3"><button class="cell tap" onclick="openVital('sono')"><div class="lbl">Sono</div><span class="num">${fmtSleep(w.sleep)}</span><div class="meta">última noite</div></button><button class="cell tap" onclick="openVital('vo2')"><div class="lbl">VO2 Máx</div><span class="num">${vo2?vo2.vo2:'--'}</span><div class="meta">${vo2?'Garmin '+vo2.d.slice(8)+'/'+vo2.d.slice(5,7):''}</div></button><button class="cell tap" onclick="openVital('fc')"><div class="lbl">FC repouso</div><span class="num">${w.rhr||'--'}<small> bpm</small></span><div class="meta">${r.rb?'média '+r.rb.toFixed(0):''}</div></button></div>`;
+  const mP=h.length;
   // próxima atividade
   const nx=plan().filter(p=>p.date>=ds&&!runsOn(p.date).length)[0];
   h+=`<div class="sec">PRÓXIMA ATIVIDADE</div>`;
@@ -745,7 +755,9 @@ function rIni(){
     <div class="grid g2" style="margin-top:8px">${nx.date<=ds?`<button class="b" onclick="markDone('${nx.date}')">✓ Marcar feito</button>`:`<button class="b" onclick="openDay('${nx.date}')">Ver o dia</button>`}<button class="b" onclick="openBuilder('${nx.date}')">Editar treino</button></div></div>`}
   else if(PF)h+=`<div class="card cur"><h2>Plano concluído</h2><p class="empty" style="margin-top:4px">Os treinos deste ciclo acabaram. Responda o questionário de novo para montar o próximo com base no que você fez.</p><button class="b pri full" style="margin-top:10px" onclick="redoPlan()">Montar o próximo plano</button></div>`;
   else h+=`<div class="card"><p class="empty">Nenhuma atividade planejada.</p><button class="b full" style="margin-top:8px" onclick="openBib()">+ Escolher um treino</button></div>`;
+  const mE=h.length;
   h+=`<div class="meta" style="text-align:center;margin-top:14px">${D.at?'Sincronizado '+new Date(D.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'Nunca sincronizado'}</div>`;
+  if(SIMPLES())h=h.slice(0,mU)+h.slice(mP,mE)+h.slice(mU,mD)+h.slice(mE); // treino de hoje primeiro
   el.innerHTML=h;
 }
 window.checkin=n=>{const c=LS.get('ck',{});c[ymd(TODAY())]=n;LS.set('ck',c);render()};
@@ -977,7 +989,9 @@ function rMais(){
     h+=`<div class="sec">MEU PLANO</div><div class="card"><div class="grid g2"><div class="cell"><div class="lbl">Meta</div><span class="num" style="font-size:14px">${M.n}</span></div><div class="cell"><div class="lbl">Duração</div><span class="num" style="font-size:14px">${P.length?fmtD(P[0].date)+' a '+fmtD(P[P.length-1].date):'--'}</span></div><div class="cell"><div class="lbl">Dias</div><span class="num" style="font-size:14px">${ORD.filter(d=>PF.dias.includes(d)).map(d=>DOW[d]).join(' ')}</span></div><div class="cell"><div class="lbl">Longão</div><span class="num" style="font-size:14px">${DNOME[ld]}</span></div></div>
     <p class="empty" style="margin-top:8px">Ritmo leve: ${fmtP(Z.E[0])}–${fmtP(Z.E[1])}/km. O volume sobe no máximo 8% por semana e, a cada 4 semanas, uma semana mais leve para o corpo assimilar.</p><p class="empty" style="margin-top:6px">Nível do plano: <b style="color:var(--hi)">${['iniciante','intermediário','avançado'][nivelDe(PF)]}</b>. Cada treino de qualidade se repete por 2 semanas antes de subir de degrau, e a cada 8 semanas o app marca um teste de 1 km para recalibrar os seus ritmos.</p>
     <button class="b full" style="margin-top:10px" onclick="redoPlan()">Refazer o questionário</button></div>`}
+  h+=`<div class="sec">MODO DO APP</div><div class="card"><div class="seg"><button class="${SIMPLES()?'on':''}" onclick="setSimples(1)">SIMPLES</button><button class="${SIMPLES()?'':'on'}" onclick="setSimples(0)">COMPLETO</button></div><p class="empty" style="margin-top:8px">${SIMPLES()?'Mostra só o essencial: o treino de hoje, o último treino e a semana. Os números avançados ficam guardados e aparecem no modo Completo.':'Mostra tudo: disposição, forma e fadiga, vitais e métricas avançadas.'}</p></div>`;
   h+=`<div class="sec">BIBLIOTECA DE TREINOS</div><div class="card"><p class="empty" style="color:var(--txt)">${BIBL.length} treinos prontos: rodagens, fartlek, ritmo, tiros, HIIT, pirâmide, escada de ritmos e testes. Veja como é cada um e agende no calendário, nos seus ritmos.</p><button class="b pri full" style="margin-top:10px" onclick="openBib()">Abrir a biblioteca</button></div>`;
+  const mA=h.length;
   h+=`<div class="sec">MÉTRICAS AVANÇADAS</div><div class="card"><div class="grid g2"><div class="cell"><div class="lbl" style="display:flex;align-items:center;justify-content:space-between">VDOT ${qb('vdot')}</div><span class="num">${V?V.v.toFixed(1):'--'}</span><div class="meta">${V?(V.est?'estimado pelo questionário':'base: '+(V.dist/1000)+' km em '+fmtT(V.t)):'sem esforço de 1,5 km ou mais'}</div></div><div class="cell"><div class="lbl" style="display:flex;align-items:center;justify-content:space-between">Rampa 7 dias ${qb('rampa')}</div><span class="num ${ramp>8?'bad':ramp>5?'warn':''}">${(ramp>0?'+':'')+ramp.toFixed(1)}</span><div class="meta">seguro: até +5 por semana</div></div></div>
   ${V?`<div class="lbl" style="margin-top:12px">Projeção de prova (condicionamento atual)</div><table style="margin-top:4px"><tr><th>Prova</th><th class="r">Tempo</th><th class="r">Ritmo</th></tr>${[[5000,'5 km'],[10000,'10 km'],[21097.5,'21 km'],[42195,'42 km']].map(([d,n])=>{const s=predict(V.v,d);return `<tr><td>${n}</td><td class="r">${fmtT(s)}</td><td class="r">${fmtP(s/d*1000)}</td></tr>`}).join('')}</table>
   <div class="lbl" style="margin-top:12px">Ritmos de treino (Daniels)</div><table style="margin-top:4px">${[['E','Leve / rodagem'],['M','Maratona'],['T','Limiar'],['I','Intervalado'],['R','Repetição']].map(([k,n])=>`<tr><td>${k}</td><td style="font-family:var(--f)">${n}</td><td class="r">${fmtP(Z[k][0])}–${fmtP(Z[k][1])}</td></tr>`).join('')}</table>`:''}
@@ -986,6 +1000,7 @@ function rMais(){
   h+=`<div class="sec">PARÂMETROS FISIOLÓGICOS<small>DO INTERVALS.ICU</small></div><div class="card"><div class="grid g3"><div class="cell"><div class="lbl">FC máx</div><span class="num">${run.max_hr||CFG.fcmax}</span></div><div class="cell"><div class="lbl">FC limiar</div><span class="num">${run.lthr||'--'}</span></div><div class="cell"><div class="lbl">FC repouso</div><span class="num">${a.rhr||CFG.fcrep}</span></div></div>
   <table style="margin-top:10px"><tr><th>Zona</th><th class="r">FC</th></tr>${z.map((v,i)=>`<tr><td style="font-family:var(--f)">${zn[i]}</td><td class="r">${i?z[i-1]+1:0}–${v}</td></tr>`).join('')}</table>
   <p class="empty" style="margin-top:8px">As zonas vêm do Intervals.icu. Para mudar, edite lá (Configurações → Corrida) e sincronize.</p></div>`;
+  if(SIMPLES())h=h.slice(0,mA);
   h+=`<div class="sec">CONEXÃO</div><details class="card" ${CFG.key?'':'open'}><summary><span>Intervals.icu</span>${CFG.key?'<span class="tag ok">CONECTADO</span>':'<span class="tag bad">SEM CHAVE</span>'}</summary>${connForm('saveConn()','Salvar e sincronizar')}</details>
   <div class="sec">SOBRE</div><div class="card"><p class="empty">Coach: por enquanto a leitura e os ajustes são calculados no próprio app (carga pela FC, forma, fadiga, VDOT, deriva cardíaca). A conexão com o Claude pela API da Anthropic entra na próxima fase, por um servidor próprio, para a chave não ficar no celular.</p><p class="empty" style="margin-top:8px"><a href="privacidade.html" target="_blank" rel="noopener" style="color:var(--blue)">Política de privacidade</a></p></div>`;
   $('#mais').innerHTML=h;
@@ -1118,7 +1133,7 @@ window.openAct=async id=>{
   if(a.dist&&!AX[id]&&!isMan(a)){openSheet('<p class="empty">Carregando parciais…</p>');try{await loadAX(id);LS.set('ax5',AX)}catch(e){}}
   if(isRun(a)&&!isMan(a)&&AX[id]&&AX[id].etapas===undefined&&CFG.key){openSheet('<p class="empty">Carregando etapas…</p>');await loadEtapas(id)}
   const x=AX[id]||{},pace=a.dist?a.mov/a.dist*1000:null;
-  let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>${x.map?mapBox(id,220):''}
+  let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>${x.map?mapBox(id,220)+`<button class="b full" style="margin-top:8px" onclick="openCartao('${id}')">Compartilhar cartão</button>`:''}
   <div class="grid g3" style="margin-top:10px"><div class="cell"><div class="lbl">Dist.</div><span class="num">${km(a.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(a.mov)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${fmtP(pace)}</span></div><div class="cell"><div class="lbl">FC méd</div><span class="num">${a.hr||'--'}</span></div><div class="cell"><div class="lbl">FC máx</div><span class="num">${a.hrmax||'--'}</span></div><div class="cell"><div class="lbl">Carga</div><span class="num">${Math.round(loadOf(a))}</span></div><div class="cell"><div class="lbl">Altimetria</div><span class="num">${a.elev!=null?Math.round(a.elev)+'<small> m</small>':'--'}</span></div><div class="cell"><div class="lbl">Cadência</div><span class="num">${a.cad?Math.round(a.cad*2):'--'}</span></div><div class="cell"><div class="lbl">Deriva FC</div><span class="num">${x.dec!=null?x.dec+'%':'--'}</span></div></div>`;
   if(x.chart&&x.chart.p.length>3){const P=x.chart.p.map(v=>v&&v<600?v:null),H=x.chart.h,pv=P.filter(Boolean),hv=H.filter(Boolean);const pmn=Math.min(...pv),pmx=Math.max(...pv),hmn=Math.min(...hv),hmx=Math.max(...hv),w=600,hh=110,X=i=>i/(P.length-1)*w;
     const pl=(arr,mn,mx,inv,c)=>`<polyline fill="none" style="stroke:${c}" stroke-width="1.5" points="${arr.map((v,i)=>v==null?'':X(i).toFixed(1)+','+(inv?8+(v-mn)/((mx-mn)||1)*(hh-16):hh-8-(v-mn)/((mx-mn)||1)*(hh-16)).toFixed(1)).filter(Boolean).join(' ')}"/>`;
@@ -1138,6 +1153,61 @@ function openSheet(h){const b=$('#sbox'),on=$('#sheet').classList.contains('on')
 })();
 window.closeSheet=()=>$('#sheet').classList.remove('on');
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet()});
+
+/* ================= cartão para compartilhar (PNG com fundo transparente, para stories) ================= */
+const CART={id:null,cor:'branco',corta:1};
+const CARTC={branco:{c:'#ffffff',sh:'rgba(0,0,0,.45)',bg:'dark'},azul:{c:'#4a9eff',sh:'rgba(0,0,0,.4)',bg:'dark'},preto:{c:'#111111',sh:'rgba(255,255,255,.55)',bg:'light'}};
+// trajeto da corrida; por padrão sem os 200 m do começo e do fim, para não mostrar onde a pessoa mora
+function cartTrack(id,corta){
+  const a=((AX[id]||{}).map||[]).filter(q=>q&&isFinite(q[0])&&isFinite(q[1]));if(a.length<2)return [];
+  let t=a;
+  if(corta){let i=0,d=0;while(i<a.length-1&&d<200){d+=dM(a[i],a[i+1]);i++}let j=a.length-1;d=0;while(j>i&&d<200){d+=dM(a[j],a[j-1]);j--}const c=a.slice(i,j+1);if(c.length>=3)t=c}
+  const st=Math.max(1,Math.ceil(t.length/700));return t.filter((_,k)=>k%st===0||k===t.length-1);
+}
+function drawCart(cv){
+  const a=D.acts.find(x=>x.id===CART.id);if(!a||!cv)return;
+  const W=1080,H=1350,ctx=cv.getContext('2d'),K=CARTC[CART.cor],F='-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif';
+  cv.width=W;cv.height=H;ctx.clearRect(0,0,W,H);
+  const tr=cartTrack(CART.id,CART.corta);
+  if(tr.length>1){
+    const la0=tr.reduce((s,q)=>s+q[0],0)/tr.length,cs=Math.cos(la0*Math.PI/180),P=tr.map(q=>[q[1]*cs,-q[0]]);
+    const xs=P.map(p=>p[0]),ys=P.map(p=>p[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+    const bw=880,bh=620,sc=Math.min(bw/((x1-x0)||1e-9),bh/((y1-y0)||1e-9)),ox=(W-(x1-x0)*sc)/2,oy=80+(bh-(y1-y0)*sc)/2;
+    ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=K.c;ctx.lineWidth=14;ctx.shadowColor=K.sh;ctx.shadowBlur=18;
+    ctx.beginPath();P.forEach((p,i)=>{const X=ox+(p[0]-x0)*sc,Y=oy+(p[1]-y0)*sc;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)});ctx.stroke();
+  }
+  ctx.fillStyle=K.c;ctx.shadowColor=K.sh;ctx.shadowBlur=14;
+  const sp=(t,x,y,ls)=>{const w=[...t].reduce((s,c)=>s+ctx.measureText(c).width+ls,-ls);let X=x-w/2;ctx.textAlign='left';for(const c of t){ctx.fillText(c,X,y);X+=ctx.measureText(c).width+ls}ctx.textAlign='center'};
+  ctx.textAlign='center';ctx.globalAlpha=.85;ctx.font=`600 30px ${F}`;
+  sp(`${a.date.slice(8,10)} ${MES[+a.date.slice(5,7)-1]} ${a.date.slice(0,4)}`,W/2,800,6);ctx.globalAlpha=1;
+  // distância em destaque
+  const d=km(a.dist).replace('.',','),pace=a.dist?a.mov/a.dist*1000:null;
+  ctx.font=`800 230px ${F}`;const w1=ctx.measureText(d).width;ctx.font=`700 72px ${F}`;const w2=ctx.measureText('km').width,gap=22,X0=(W-(w1+gap+w2))/2;
+  ctx.textAlign='left';ctx.font=`800 230px ${F}`;ctx.fillText(d,X0,1010);ctx.font=`700 72px ${F}`;ctx.fillText('km',X0+w1+gap,1010);ctx.textAlign='center';
+  // três dados embaixo
+  const el=a.elev!=null&&a.elev>=1?['SUBIDA',Math.round(a.elev)+' m']:a.hr?['FC MÉDIA',String(a.hr)]:['DIA',a.date.slice(8,10)+'/'+a.date.slice(5,7)];
+  const col=[['TEMPO',fmtT(a.mov)],['RITMO /KM',fmtP(pace)],el];
+  col.forEach(([l,v],i)=>{const x=W*(2*i+1)/6;ctx.globalAlpha=.8;ctx.font=`600 28px ${F}`;sp(l,x,1100,5);ctx.globalAlpha=1;ctx.font=`700 78px ${F}`;ctx.fillText(v,x,1185)});
+  // nome do app, quase invisível
+  ctx.shadowBlur=0;ctx.globalAlpha=.5;ctx.font=`600 26px ${F}`;sp('BOONIE RUN',W/2,1300,10);ctx.globalAlpha=1;
+}
+window.openCartao=id=>{
+  CART.id=id;
+  openSheet(`<div class="hd"><b>CARTÃO PARA COMPARTILHAR</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <div class="cartbg ${CARTC[CART.cor].bg}"><canvas id="cart" style="display:block;margin:0 auto;width:auto;height:auto;max-width:100%;max-height:52vh"></canvas></div>
+  <div class="seg" style="margin-top:12px">${Object.keys(CARTC).map(k=>`<button class="${CART.cor===k?'on':''}" onclick="cartCor('${k}')">${k.toUpperCase()}</button>`).join('')}</div>
+  <label class="row" style="gap:10px;margin-top:12px;flex-wrap:nowrap;font-size:13px"><input type="checkbox" ${CART.corta?'checked':''} onchange="cartCorta(this.checked)" style="width:22px;height:22px;flex:none"><span>Esconder os 200 m do começo e do fim, para não mostrar onde você mora</span></label>
+  <div class="grid g2" style="margin-top:12px"><button class="b pri" onclick="cartShare()">Compartilhar</button><button class="b" onclick="cartSave()">Salvar imagem</button></div>
+  <p class="meta" style="margin-top:8px">A imagem tem fundo transparente: dá para usar como adesivo nos stories.</p>
+  <button class="b full" style="margin-top:10px" onclick="openAct('${esc(id)}')">◀ Voltar à corrida</button>`);
+  drawCart($('#cart'));
+};
+window.cartCor=k=>{CART.cor=k;openCartao(CART.id)};
+window.cartCorta=v=>{CART.corta=v?1:0;drawCart($('#cart'))};
+const cartBlob=()=>new Promise(r=>$('#cart').toBlob(r,'image/png'));
+window.cartSave=async()=>{const b=await cartBlob();if(!b)return toast('NÃO FOI POSSÍVEL GERAR A IMAGEM');const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='boonie-run.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('IMAGEM SALVA')};
+window.cartShare=async()=>{const b=await cartBlob();if(!b)return toast('NÃO FOI POSSÍVEL GERAR A IMAGEM');const f=new File([b],'boonie-run.png',{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:'Boonie Run'})}catch(e){}}else cartSave()};
 
 /* ================= conexão com o Intervals (assistente passo a passo) ================= */
 // reconhece o ID (i + números) e a chave (texto longo) mesmo colados juntos, com "API_KEY:" ou com espaços
@@ -1200,8 +1270,11 @@ function histo(){
   const w4=since(28).reduce((s,a)=>s+(a.dist||0),0)/4000,L=Math.max(0,...since(56).map(a=>a.dist||0))/1000,V=curVdot();
   return {n:r.length,w4,L,V:V&&V.v};
 }
-function obInit(){const H=histo();OB.a={relogio:null,meta:null,dias:[2,4,0],longo:0,km0:H.n?(H.w4<1?0:H.w4<10?7:H.w4<20?15:H.w4<35?27:40):null,t5:null,H}}
-const OBS=[{id:'conn',show:()=>!CFG.key},{id:'oi'},{id:'relogio'},{id:'meta'},{id:'dias'},{id:'longo'},{id:'km0'},{id:'t5',show:()=>!!OB.a&&!OB.a.H.V},{id:'fim'}];
+function obInit(){const H=histo();OB.a={relogio:OB.relogio||null,meta:null,dias:[2,4,0],longo:0,km0:H.n?(H.w4<1?0:H.w4<10?7:H.w4<20?15:H.w4<35?27:40):null,t5:null,H}}
+const CONNTXT={garmin:'Conecte o Intervals.icu: é ele que manda os treinos para o seu Garmin e traz as suas corridas de volta. São 3 passos.',
+  outro:'O Intervals.icu é o site gratuito que guarda as suas corridas e conversa com vários relógios. Confira nas dúvidas abaixo se o seu aparece por lá. São 3 passos.',
+  nenhum:'Sem relógio, o Intervals.icu serve só de arquivo: é onde ficam guardadas as corridas que você grava pelo app. É gratuito e leva uns 3 minutos. São 3 passos.'};
+const OBS=[{id:'relogio',show:()=>!OB.skipRel},{id:'conn',show:()=>!CFG.key},{id:'oi'},{id:'meta'},{id:'dias'},{id:'longo'},{id:'km0'},{id:'t5',show:()=>!!OB.a&&!OB.a.H.V},{id:'fim'}];
 function obPF(){
   const a=OB.a,H=a.H,km0=a.km0||0,L0=H.L>=1?H.L:{0:0,7:3,15:5,27:8,40:12}[km0];
   const V=H.V||vdot(5000,a.t5||(km0?2100:2700));
@@ -1209,11 +1282,11 @@ function obPF(){
 }
 function rOB(){
   const el=$('#ini');if(CFG.key&&!OB.a)obInit();
-  const st=OBS.filter(s=>!s.show||s.show());OB.i=clamp(OB.i,0,st.length-1);const s=st[OB.i],a=OB.a||{};
+  const st=OBS.filter(s=>!s.show||s.show());OB.i=clamp(OB.i,0,st.length-1);const s=st[OB.i],a=OB.a||{relogio:OB.relogio};
   const q=v=>typeof v==='string'?`'${v}'`:v;
   const o=(k,v,t,sub)=>`<button class="opt ${a[k]===v?'on':''}" onclick="obSet('${k}',${q(v)})"><span>${t}${sub?`<small>${sub}</small>`:''}</span></button>`;
   let h=s.id==='conn'?'':`<div class="row" style="justify-content:space-between;margin-bottom:8px">${OB.i>(CFG.key?0:1)?`<button class="b sm" onclick="obGo(-1)">◀ Voltar</button>`:OB.force?`<button class="b sm" onclick="obCancel()">Cancelar</button>`:'<span></span>'}<span class="meta">${OB.i+1} de ${st.length}</span></div><div class="bar" style="margin-bottom:18px"><i style="width:${(OB.i+1)/st.length*100}%"></i></div>`;
-  if(s.id==='conn')h+=`<div style="text-align:center;margin:8px 0 14px"><img src="logo.png" alt="" style="height:90px;mix-blend-mode:screen"></div><div class="obh">Bem-vindo ao Boonie Run</div><p class="obp">Para começar, conecte a sua conta do Intervals.icu, o site gratuito onde ficam as suas corridas. São 3 passos.</p>
+  if(s.id==='conn')h+=`<button class="b sm" onclick="obGo(-1)">◀ Voltar</button><div class="obh" style="margin-top:12px">Conecte o Intervals.icu</div><p class="obp">${CONNTXT[a.relogio]||'Conecte a sua conta do Intervals.icu, o site gratuito onde ficam as suas corridas. São 3 passos.'}</p>
     <div class="card"><div class="cs"><i>1</i><div><b>Tenha uma conta no Intervals</b><p class="empty">O cadastro é gratuito. Já tem conta? Pule para o passo 2.</p></div></div><a class="b full" href="https://intervals.icu/" target="_blank" rel="noopener">Abrir o Intervals.icu</a></div>
     <div class="card"><div class="cs"><i>2</i><div><b>Copie o ID e a chave</b><p class="empty">No Intervals, abra <b>Settings</b> e desça até <b>Developer Settings</b>. Copie o <b>Athlete ID</b> (começa com i). Se ainda não houver uma <b>API Key</b>, crie e copie também.</p></div></div><a class="b full" href="https://intervals.icu/settings" target="_blank" rel="noopener">Abrir as configurações</a></div>
     <div class="card cur"><div class="cs"><i>3</i><div><b>Cole aqui</b><p class="empty">Volte ao app e toque em Colar. Se copiou o ID e a chave em momentos diferentes, cole um de cada vez.</p></div></div>${connForm('obConn()','Conectar')}</div>
@@ -1226,7 +1299,7 @@ function rOB(){
     h+=`<div class="obh">Vamos montar o seu plano${nm?', '+esc(nm):''}</div><p class="obp">São poucas perguntas rápidas. Com as respostas e o seu histórico, o app monta os treinos semana a semana.</p>
     ${H.n?`<div class="card"><div class="lbl">Seu histórico no Intervals</div><div class="grid g3" style="margin-top:6px"><div class="cell"><div class="lbl">Corridas</div><span class="num">${H.n}</span></div><div class="cell"><div class="lbl">Km/semana</div><span class="num">${H.w4.toFixed(1)}</span><div class="meta">últ. 4 sem.</div></div><div class="cell"><div class="lbl">Maior</div><span class="num">${H.L.toFixed(1)}<small> km</small></span><div class="meta">últ. 8 sem.</div></div></div></div>`:`<div class="card"><p class="empty">Ainda não há corridas no seu Intervals. Sem problema: o plano começa leve.</p></div>`}
     <button class="b pri full" style="margin-top:6px" onclick="obGo(1)">Começar</button>`}
-  if(s.id==='relogio')h+=`<div class="obh">Qual relógio você usa?</div><p class="obp">Serve para saber se o app pode mandar o treino direto para o pulso.</p>${o('relogio','garmin','Garmin','Recebe os treinos no relógio')}${o('relogio','outro','Outra marca','Você segue o treino pela tela do app')}${o('relogio','nenhum','Não uso relógio','Corre com o celular ou outro app')}`;
+  if(s.id==='relogio')h+=`${CFG.key?'':'<div style="text-align:center;margin:8px 0 14px"><img src="logo.png" alt="" style="height:90px;mix-blend-mode:screen"></div>'}<div class="obh">Você usa relógio de corrida?</div><p class="obp">${CFG.key?'Serve para saber se o app pode mandar o treino direto para o pulso.':'Bem-vindo ao Boonie Run! Com essa resposta o app já sabe como montar tudo para você.'}</p>${o('relogio','garmin','Sim, Garmin','O treino vai direto para o relógio')}${o('relogio','outro','Sim, outra marca','Você segue o treino pela tela do app')}${o('relogio','nenhum','Não uso relógio','Você segue o treino e grava a corrida pelo celular')}`;
   if(s.id==='meta')h+=`<div class="obh">Qual é o seu objetivo?</div><p class="obp">O plano vai até a data da meta. Depois é só montar o próximo.</p>${o('meta','c','Criar constância','Correr com regularidade · 8 semanas')}${o('meta','5','Correr 5 km','8 semanas')}${o('meta','10','Correr 10 km','10 semanas')}${o('meta','21','Meia maratona (21 km)','16 semanas')}`;
   if(s.id==='dias')h+=`<div class="obh">Em quais dias você pode correr?</div><p class="obp">Escolha pelo menos 2. Para quem está começando ou voltando, 3 dias é o ideal.</p><div class="chips">${ORD.map(d=>`<button class="${a.dias.includes(d)?'on':''}" onclick="obDia(${d})">${DOW[d]}</button>`).join('')}</div><p class="meta" style="margin-top:10px">${a.dias.length} ${a.dias.length===1?'dia':'dias'} por semana</p><button class="b pri full" style="margin-top:16px" ${a.dias.length<2?'disabled':''} onclick="obGo(1)">Continuar</button>`;
   if(s.id==='longo')h+=`<div class="obh">Em qual dia fica o treino mais longo?</div><p class="obp">O longão pede mais tempo livre. Costuma ser no fim de semana.</p>${ORD.filter(d=>a.dias.includes(d)).map(d=>o('longo',d,DNOME[d])).join('')}`;
@@ -1243,9 +1316,9 @@ function rOB(){
   if($('#c-go'))connStatus();
 }
 window.obGo=n=>{OB.i+=n;$('#v-ini').scrollTop=0;rOB()};
-window.obSet=(k,v)=>{OB.a[k]=v;obGo(1)};
+window.obSet=(k,v)=>{if(OB.a)OB.a[k]=v;else OB[k]=v;obGo(1)};
 window.obDia=d=>{const a=OB.a;a.dias=a.dias.includes(d)?a.dias.filter(x=>x!==d):a.dias.concat(d);if(!a.dias.includes(a.longo))a.longo=a.dias.includes(0)?0:a.dias.includes(6)?6:a.dias[a.dias.length-1];rOB()};
-window.obConn=async()=>{const a=await connTry();if(!a)return;saveCfg();toast('CONECTADO // '+(a.name||''),2500);OB={i:0,a:null};await sync(0)};
+window.obConn=async()=>{const a=await connTry();if(!a)return;saveCfg();toast('CONECTADO // '+(a.name||''),2500);OB={i:0,a:null,relogio:OB.relogio,skipRel:!!OB.relogio};await sync(0)};
 window.obDone=()=>{PF=obPF();LS.set('pf',PF);OB={i:0,a:null};
   // a meta do objetivo entra (ou é atualizada) nos Desafios
   const M=META[PF.meta],P=genPlan(PF);
