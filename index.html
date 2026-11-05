@@ -270,6 +270,15 @@ select{min-height:44px}
 .sec{color:var(--dim);letter-spacing:.08em;font-weight:600;border-bottom:0;justify-content:flex-start;padding-bottom:2px}
 .sec:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--blue);margin-right:8px;flex:none}
 .sec>small,.sec>button,.sec>span~*{margin-left:auto}
+#top{gap:6px}#top .brand img{height:30px}#top .brand b{font-size:13px;letter-spacing:.05em}
+#appnm{position:absolute;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top));height:40px;display:flex;align-items:center;font:700 10px var(--m);letter-spacing:.18em;color:var(--hi);white-space:nowrap;pointer-events:none}
+:root[data-theme="light"] #appnm{color:#fff}
+#sync{width:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center}
+#sync svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+#sync.gira svg{animation:sp 1s linear infinite}
+@media (max-width:349px){#appnm{display:none}}
+.lvl{width:54px;height:54px;flex:none;border-radius:50%;background:var(--blue);color:var(--onblue);display:grid;place-items:center;font:800 22px var(--m)}
+.card.tap{cursor:pointer}
 /* aba ativa marcada por uma bolinha azul */
 #tabbar button{position:relative}
 #tabbar button.on{box-shadow:none}
@@ -278,8 +287,9 @@ select{min-height:44px}
 </head>
 <body>
 <header id="top">
-  <div class="brand"><img src="logo.svg" alt=""><div><b id="ttl">INÍCIO</b><small>BOONIE RUN</small></div></div>
-  <button id="sync" class="b sm" title="Sincronizar">SYNC</button>
+  <div class="brand"><img src="logo.svg" alt=""><b id="ttl">INÍCIO</b></div>
+  <div id="appnm">BOONIE RUN</div>
+  <button id="sync" class="b sm" title="Sincronizar" aria-label="Sincronizar"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg></button>
   <button id="tema" onclick="togTema()" aria-label="Trocar tema"></button>
   <button id="av" aria-label="Perfil"><img id="avimg" src="logo.svg" alt=""><i id="avst"></i></button>
 </header>
@@ -353,7 +363,7 @@ let AX=LS.get('ax5',{}); // análise por atividade: splits, best efforts, deriva
 const slim=a=>({id:a.id,date:a.start_date_local,type:a.type,name:a.name,dist:a.distance,mov:a.moving_time,el:a.elapsed_time,hr:a.average_heartrate,hrmax:a.max_heartrate,load:a.icu_training_load,trimp:a.trimp,elev:a.total_elevation_gain,cad:a.average_cadence,rpe:a.icu_rpe,feel:a.feel,speed:a.average_speed,src:a.source});
 
 async function sync(full){
-  const btn=$('#sync');btn.disabled=true;btn.textContent='...';
+  const btn=$('#sync');btn.disabled=true;btn.classList.add('gira');
   try{
     const t=TODAY(),old=ymd(addD(t,-400)),nw=ymd(addD(t,1));
     const [ath,acts,well,evs]=await Promise.all([api('/athlete/'+CFG.athlete),api(`/athlete/${CFG.athlete}/activities?oldest=${old}&newest=${nw}`),api(`/athlete/${CFG.athlete}/wellness?oldest=${old}&newest=${nw}`),api(`/athlete/${CFG.athlete}/events?oldest=${ymd(addD(t,-60))}&newest=${ymd(addD(t,120))}&category=WORKOUT`)]);
@@ -369,7 +379,7 @@ async function sync(full){
     publishMine().catch(()=>{}); // corrida nova entra no ranking público (só para quem aceitou)
     toast('SINCRONIZADO // '+D.acts.length+' ATIVIDADES');
   }catch(e){toast(e.message==='SEM CHAVE'?'CONFIGURE A CHAVE EM MAIS':'FALHA NA SINCRONIZAÇÃO // '+e.message,3500)}
-  btn.disabled=false;btn.textContent='SYNC';render();
+  btn.disabled=false;btn.classList.remove('gira');render();setTimeout(checaNivel,2700);
 }
 
 /* streams → parciais por km, melhores esforços, deriva cardíaca */
@@ -1086,7 +1096,8 @@ function rPerf(){
   const tot=runs.filter(x=>x.date.slice(0,4)===yr).reduce((s,x)=>s+(x.dist||0),0);
   let h=`<div class="card cur" style="display:flex;gap:12px;align-items:center"><button onclick="pickFoto()" aria-label="Trocar foto" style="position:relative;flex:none;background:none;border:0;padding:0"><img src="${esc(myPic())}" alt="" style="width:62px;height:62px;border-radius:50%;border:1px solid var(--blue);object-fit:cover;display:block"><span style="position:absolute;right:-2px;bottom:-2px;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#000;font-size:13px;line-height:22px;font-weight:700">✎</span></button><div><h2>${esc(a.name||'Atleta')}</h2><div class="meta">${esc(a.city||'')}${a.weight?' · '+a.weight+' kg':''}</div><div class="meta">${runs.length} corridas · ${km(tot)} km em ${yr}</div></div></div>
   <div class="row" style="margin:-2px 0 4px;gap:8px"><button class="b sm" onclick="pickFoto()">Trocar foto</button>${LS.get('foto',null)?`<button class="b sm" onclick="resetFoto()">Usar a do Intervals</button>`:''}</div>`;
-  h+=`<div class="sec">MELHORES MARCAS<small>BEST EFFORTS</small></div><div class="card"><table><tr><th>Distância</th><th class="r">Tempo</th><th class="r">Ritmo</th><th class="r">Data</th></tr>${BE.map(([d,n])=>{const b=B[d];return `<tr ${b?`onclick="openAct('${b.id}')"`:''}><td>${n}</td><td class="r">${b?fmtT(b.t):'--'}</td><td class="r">${b?fmtP(b.t/d*1000):'--'}</td><td class="r dim">${b?b.date.slice(8,10)+'/'+b.date.slice(5,7)+'/'+b.date.slice(2,4):''}</td></tr>`}).join('')}</table><p class="empty" style="margin-top:6px">Melhor trecho de cada distância dentro das suas corridas (trilhas ficam de fora por causa do GPS). No 1 km, tempo e ritmo são o mesmo número, porque ritmo é o tempo por km.</p></div>`;
+  h+=`<div class="sec">NÍVEL DA CONTA</div>${nivelCard()}`;
+  h+=`<div class="sec">MELHORES MARCAS<small>POR DISTÂNCIA</small></div><div class="card"><table><tr><th>Distância</th><th class="r">Tempo</th><th class="r">Ritmo</th><th class="r">Data</th></tr>${BE.map(([d,n])=>{const b=B[d];return `<tr ${b?`onclick="openAct('${b.id}')"`:''}><td>${n}</td><td class="r">${b?fmtT(b.t):'--'}</td><td class="r">${b?fmtP(b.t/d*1000):'--'}</td><td class="r dim">${b?b.date.slice(8,10)+'/'+b.date.slice(5,7)+'/'+b.date.slice(2,4):''}</td></tr>`}).join('')}</table><p class="empty" style="margin-top:6px">Melhor trecho de cada distância dentro das suas corridas (trilhas ficam de fora por causa do GPS). No 1 km, tempo e ritmo são o mesmo número, porque ritmo é o tempo por km.</p></div>`;
   const BL=badgeList(),sorted=[...BL.filter(b=>b.on),...BL.filter(b=>!b.on)];
   h+=`<div class="sec">CONQUISTAS<small>${BL.filter(b=>b.on).length}/${BL.length}</small></div><div class="grid g3">${sorted.slice(0,6).map(badgeHtml).join('')}</div><button class="b more" onclick="openBadges()">Ver todas as conquistas</button>`;
   h+=`<div class="sec">REGISTRO DE ATIVIDADES<small>${D.acts.length}</small></div><div class="card list">${D.acts.slice(0,LIM).map(x=>`<div class="it" onclick="openAct('${x.id}')"><div class="ic">${typeIc(x)}</div><div class="t"><b>${esc(x.name)}</b><span class="meta">${x.date.slice(8,10)}/${x.date.slice(5,7)}/${x.date.slice(2,4)} · ${fmtT(x.mov)}</span></div><div class="v">${x.dist?km(x.dist)+' km':''}<br><span class="dim">${isRun(x)&&x.dist?fmtP(x.mov/x.dist*1000)+'/km':x.hr?x.hr+' bpm':''}</span></div></div>`).join('')||'<p class="empty">Sem atividades.</p>'}</div>${D.acts.length>LIM?`<button class="b more" onclick="verMais()">Ver mais (${Math.min(8,D.acts.length-LIM)} de ${D.acts.length-LIM} restantes)</button>`:''}`;
@@ -1174,7 +1185,7 @@ window.openAct=async id=>{
   if(a.dist&&!AX[id]&&!isMan(a)){openSheet('<p class="empty">Carregando parciais…</p>');try{await loadAX(id);LS.set('ax5',AX)}catch(e){}}
   if(isRun(a)&&!isMan(a)&&AX[id]&&AX[id].etapas===undefined&&CFG.key){openSheet('<p class="empty">Carregando etapas…</p>');await loadEtapas(id)}
   const x=AX[id]||{},pace=a.dist?a.mov/a.dist*1000:null;
-  let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>${x.map?mapBox(id,220)+`<button class="b full" style="margin-top:8px" onclick="openCartao('${id}')">Compartilhar cartão</button>`:''}
+  let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>${x.map?mapBox(id,220)+`<button class="b full" style="margin-top:8px" onclick="openCartao('${id}')">Compartilhar treino</button>`:''}
   <div class="grid g3" style="margin-top:10px"><div class="cell"><div class="lbl">Dist.</div><span class="num">${km(a.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(a.mov)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${fmtP(pace)}</span></div><div class="cell"><div class="lbl">FC méd</div><span class="num">${a.hr||'--'}</span></div><div class="cell"><div class="lbl">FC máx</div><span class="num">${a.hrmax||'--'}</span></div><div class="cell"><div class="lbl">Carga</div><span class="num">${Math.round(loadOf(a))}</span></div><div class="cell"><div class="lbl">Altimetria</div><span class="num">${a.elev!=null?Math.round(a.elev)+'<small> m</small>':'--'}</span></div><div class="cell"><div class="lbl">Cadência</div><span class="num">${a.cad?Math.round(a.cad*2):'--'}</span></div><div class="cell"><div class="lbl">Deriva FC</div><span class="num">${x.dec!=null?x.dec+'%':'--'}</span></div></div>`;
   if(x.chart&&x.chart.p.length>3){const P=x.chart.p.map(v=>v&&v<600?v:null),H=x.chart.h,pv=P.filter(Boolean),hv=H.filter(Boolean);const pmn=Math.min(...pv),pmx=Math.max(...pv),hmn=Math.min(...hv),hmx=Math.max(...hv),w=600,hh=110,X=i=>i/(P.length-1)*w;
     const pl=(arr,mn,mx,inv,c)=>`<polyline fill="none" style="stroke:${c}" stroke-width="1.5" points="${arr.map((v,i)=>v==null?'':X(i).toFixed(1)+','+(inv?8+(v-mn)/((mx-mn)||1)*(hh-16):hh-8-(v-mn)/((mx-mn)||1)*(hh-16)).toFixed(1)).filter(Boolean).join(' ')}"/>`;
@@ -1196,8 +1207,8 @@ window.closeSheet=()=>$('#sheet').classList.remove('on');
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet()});
 
 /* ================= cartão para compartilhar (PNG com fundo transparente, para stories) ================= */
-const CART={id:null,cor:'branco',corta:1};
-const CARTC={branco:{c:'#ffffff',sh:'rgba(0,0,0,.45)',bg:'dark'},azul:{c:'#4a9eff',sh:'rgba(0,0,0,.4)',bg:'dark'},preto:{c:'#111111',sh:'rgba(255,255,255,.55)',bg:'light'}};
+const CART={id:null,corta:1};
+const SIMB=[[19.20,77.67,8.20],[39.82,59.64,12.99],[69.18,33.94,19.82]]; // os três discos do símbolo (cx, cy, r num quadro de 100)
 // trajeto da corrida; por padrão sem os 200 m do começo e do fim, para não mostrar onde a pessoa mora
 function cartTrack(id,corta){
   const a=((AX[id]||{}).map||[]).filter(q=>q&&isFinite(q[0])&&isFinite(q[1]));if(a.length<2)return [];
@@ -1205,45 +1216,37 @@ function cartTrack(id,corta){
   if(corta){let i=0,d=0;while(i<a.length-1&&d<200){d+=dM(a[i],a[i+1]);i++}let j=a.length-1;d=0;while(j>i&&d<200){d+=dM(a[j],a[j-1]);j--}const c=a.slice(i,j+1);if(c.length>=3)t=c}
   const st=Math.max(1,Math.ceil(t.length/700));return t.filter((_,k)=>k%st===0||k===t.length-1);
 }
+const tempoCart=s=>{s=Math.round(s||0);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}h ${pad(m)}min`:`${m}min ${pad(x)}s`};
+// imagem com fundo transparente: três dados empilhados (nome em cima, número embaixo), o trajeto em azul e o símbolo branco no pé
 function drawCart(cv){
   const a=D.acts.find(x=>x.id===CART.id);if(!a||!cv)return;
-  const W=1080,H=1350,ctx=cv.getContext('2d'),K=CARTC[CART.cor],F='-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif';
+  const W=1080,H=1440,ctx=cv.getContext('2d'),F='-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif';
   cv.width=W;cv.height=H;ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=12;
+  const pace=a.dist?a.mov/a.dist*1000:null,dados=[['Distância',km(a.dist).replace('.',',')+' km'],['Ritmo',fmtP(pace)+' /km'],['Tempo',tempoCart(a.mov)]];
+  dados.forEach(([l,v],i)=>{const y=150+i*215;ctx.font=`600 40px ${F}`;ctx.fillText(l,W/2,y);ctx.font=`800 100px ${F}`;ctx.fillText(v,W/2,y+108)});
   const tr=cartTrack(CART.id,CART.corta);
   if(tr.length>1){
     const la0=tr.reduce((s,q)=>s+q[0],0)/tr.length,cs=Math.cos(la0*Math.PI/180),P=tr.map(q=>[q[1]*cs,-q[0]]);
     const xs=P.map(p=>p[0]),ys=P.map(p=>p[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
-    const bw=880,bh=620,sc=Math.min(bw/((x1-x0)||1e-9),bh/((y1-y0)||1e-9)),ox=(W-(x1-x0)*sc)/2,oy=80+(bh-(y1-y0)*sc)/2;
-    ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=K.c;ctx.lineWidth=14;ctx.shadowColor=K.sh;ctx.shadowBlur=18;
+    const top=790,bw=700,bh=430,sc=Math.min(bw/((x1-x0)||1e-9),bh/((y1-y0)||1e-9)),ox=(W-(x1-x0)*sc)/2,oy=top+(bh-(y1-y0)*sc)/2;
+    ctx.shadowBlur=10;ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle='#4a9eff';ctx.lineWidth=11;
     ctx.beginPath();P.forEach((p,i)=>{const X=ox+(p[0]-x0)*sc,Y=oy+(p[1]-y0)*sc;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)});ctx.stroke();
   }
-  ctx.fillStyle=K.c;ctx.shadowColor=K.sh;ctx.shadowBlur=14;
-  const sp=(t,x,y,ls)=>{const w=[...t].reduce((s,c)=>s+ctx.measureText(c).width+ls,-ls);let X=x-w/2;ctx.textAlign='left';for(const c of t){ctx.fillText(c,X,y);X+=ctx.measureText(c).width+ls}ctx.textAlign='center'};
-  ctx.textAlign='center';ctx.globalAlpha=.85;ctx.font=`600 30px ${F}`;
-  sp(`${a.date.slice(8,10)} ${MES[+a.date.slice(5,7)-1]} ${a.date.slice(0,4)}`,W/2,800,6);ctx.globalAlpha=1;
-  // distância em destaque
-  const d=km(a.dist).replace('.',','),pace=a.dist?a.mov/a.dist*1000:null;
-  ctx.font=`800 230px ${F}`;const w1=ctx.measureText(d).width;ctx.font=`700 72px ${F}`;const w2=ctx.measureText('km').width,gap=22,X0=(W-(w1+gap+w2))/2;
-  ctx.textAlign='left';ctx.font=`800 230px ${F}`;ctx.fillText(d,X0,1010);ctx.font=`700 72px ${F}`;ctx.fillText('km',X0+w1+gap,1010);ctx.textAlign='center';
-  // três dados embaixo
-  const el=a.elev!=null&&a.elev>=1?['SUBIDA',Math.round(a.elev)+' m']:a.hr?['FC MÉDIA',String(a.hr)]:['DIA',a.date.slice(8,10)+'/'+a.date.slice(5,7)];
-  const col=[['TEMPO',fmtT(a.mov)],['RITMO /KM',fmtP(pace)],el];
-  col.forEach(([l,v],i)=>{const x=W*(2*i+1)/6;ctx.globalAlpha=.8;ctx.font=`600 28px ${F}`;sp(l,x,1100,5);ctx.globalAlpha=1;ctx.font=`700 78px ${F}`;ctx.fillText(v,x,1185)});
-  // nome do app, quase invisível
-  ctx.shadowBlur=0;ctx.globalAlpha=.5;ctx.font=`600 26px ${F}`;sp('BOONIE RUN',W/2,1300,10);ctx.globalAlpha=1;
+  // símbolo branco, pequeno e discreto
+  const sz=84,sx=W/2-sz/2,sy=1300-sz/2;ctx.shadowBlur=8;ctx.fillStyle='#fff';
+  for(const [cx,cy,r] of SIMB){ctx.beginPath();ctx.arc(sx+cx/100*sz,sy+cy/100*sz,r/100*sz,0,Math.PI*2);ctx.fill()}
 }
 window.openCartao=id=>{
   CART.id=id;
-  openSheet(`<div class="hd"><b>CARTÃO PARA COMPARTILHAR</b><button class="b sm" onclick="closeSheet()">✕</button></div>
-  <div class="cartbg ${CARTC[CART.cor].bg}"><canvas id="cart" style="display:block;margin:0 auto;width:auto;height:auto;max-width:100%;max-height:52vh"></canvas></div>
-  <div class="seg" style="margin-top:12px">${Object.keys(CARTC).map(k=>`<button class="${CART.cor===k?'on':''}" onclick="cartCor('${k}')">${k.toUpperCase()}</button>`).join('')}</div>
+  openSheet(`<div class="hd"><b>COMPARTILHAR TREINO</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <div class="cartbg dark"><canvas id="cart" style="display:block;margin:0 auto;width:auto;height:auto;max-width:100%;max-height:56vh"></canvas></div>
   <label class="row" style="gap:10px;margin-top:12px;flex-wrap:nowrap;font-size:13px"><input type="checkbox" ${CART.corta?'checked':''} onchange="cartCorta(this.checked)" style="width:22px;height:22px;flex:none"><span>Esconder os 200 m do começo e do fim, para não mostrar onde você mora</span></label>
   <div class="grid g2" style="margin-top:12px"><button class="b pri" onclick="cartShare()">Compartilhar</button><button class="b" onclick="cartSave()">Salvar imagem</button></div>
-  <p class="meta" style="margin-top:8px">A imagem tem fundo transparente: dá para usar como adesivo nos stories.</p>
-  <button class="b full" style="margin-top:10px" onclick="openAct('${esc(id)}')">◀ Voltar à corrida</button>`);
+  <p class="meta" style="margin-top:8px">A imagem tem fundo transparente: dá para colocar em cima de uma foto nos stories.</p>
+  <button class="b full" style="margin-top:10px" onclick="openAct('${esc(id)}')">◀ Voltar ao treino</button>`);
   drawCart($('#cart'));
 };
-window.cartCor=k=>{CART.cor=k;openCartao(CART.id)};
 window.cartCorta=v=>{CART.corta=v?1:0;drawCart($('#cart'))};
 const cartBlob=()=>new Promise(r=>$('#cart').toBlob(r,'image/png'));
 window.cartSave=async()=>{const b=await cartBlob();if(!b)return toast('NÃO FOI POSSÍVEL GERAR A IMAGEM');const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='boonie-run.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('IMAGEM SALVA')};
@@ -1609,10 +1612,10 @@ async function fotoMini(){
 const dM=(p,q)=>Math.hypot((p[0]-q[0])*111320,(p[1]-q[1])*111320*Math.cos(p[0]*Math.PI/180));
 const cen=tr=>{let a=0,b=0;for(const q of tr){a+=q[0];b+=q[1]}return [a/tr.length,b/tr.length]};
 function bestsOf(a,b0){const b={...(b0||{})};for(const [d] of CDIST)if(a.dist>=d*0.99&&a.dist<=d*1.05&&a.mov){const t=Math.round(a.mov*d/a.dist);if(!b[d]||t<b[d])b[d]=t}return b}
-function people(){
+function people(all){
   const me={id:CFG.athlete,name:((D.athlete||{}).name||'Você'),pic:myPic(),me:1,
     runs:D.acts.filter(a=>isRun(a)&&AX[a.id]&&AX[a.id].map).map(a=>({id:a.id,date:a.date,dist:a.dist,mov:a.mov,best:bestsOf(a,AX[a.id].best),map:AX[a.id].map}))};
-  return [me,...PUBL.filter(u=>u.id!==CFG.athlete&&u.runs&&u.runs.length&&(MODO()==='g'||FR.friends.includes(u.id))).map(u=>({id:u.id,name:u.name||u.id,pic:okPic(u.pic),runs:u.runs}))];
+  return [me,...PUBL.filter(u=>u.id!==CFG.athlete&&u.runs&&u.runs.length&&(all||MODO()==='g'||FR.friends.includes(u.id))).map(u=>({id:u.id,name:u.name||u.id,xp:u.xp,pic:okPic(u.pic),runs:u.runs}))];
 }
 function buildPlaces(P){
   const L=[];
@@ -1629,14 +1632,14 @@ function buildPlaces(P){
   return L;
 }
 // ranking de um local numa distância: o melhor tempo de cada atleta
-function board(pl,d,ini){const B={};for(const {u,r} of pl.runs){if(ini&&String(r.date).slice(0,10)<ini)continue;const t=r.best&&r.best[d];if(t&&(!B[u.id]||t<B[u.id].t))B[u.id]={u,t,date:r.date,id:r.id}}return Object.values(B).sort((a,b)=>a.t-b.t)}
+function board(pl,d,ini,fim){const B={};for(const {u,r} of pl.runs){if(ini&&String(r.date).slice(0,10)<ini)continue;if(fim&&String(r.date).slice(0,10)>fim)continue;const t=r.best&&r.best[d];if(t&&(!B[u.id]||t<B[u.id].t))B[u.id]={u,t,date:r.date,id:r.id}}return Object.values(B).sort((a,b)=>a.t-b.t)}
 // temporada mensal (zera todo dia 1): 1 ponto por km corrido no mês + bônus pelas marcas do mês em cada local (10, 6, 3 e 1)
 const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 function ranking(){
   const n=new Date(),ini=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-01',P=people(),R={};PLC=buildPlaces(P);
-  for(const u of P){const km=u.runs.filter(r=>String(r.date).slice(0,10)>=ini).reduce((t,r)=>t+(r.dist||0),0)/1000;R[u.id]={u,km,bonus:0,coroas:0}}
+  for(const u of P){const rm=u.runs.filter(r=>String(r.date).slice(0,10)>=ini),km=rm.reduce((t,r)=>t+(r.dist||0),0)/1000,tr=rm.filter(r=>(r.dist||0)>=1000).length;R[u.id]={u,km,tr,bonus:0,coroas:0}}
   for(const pl of PLC)for(const [d] of pl.dists)board(pl,d,ini).forEach((x,i)=>{const o=R[x.u.id];if(!o)return;o.bonus+=[10,6,3][i]||1;if(!i)o.coroas++});
-  const L=Object.values(R).map(o=>({...o,pts:Math.round(o.km)+o.bonus})).filter(o=>o.pts>0||o.u.me).sort((a,b)=>b.pts-a.pts);
+  const L=Object.values(R).map(o=>({...o,pts:Math.round(o.km)+3*o.tr+o.bonus})).filter(o=>o.pts>0||o.u.me).sort((a,b)=>b.pts-a.pts);
   return {L,mes:MESES[n.getMonth()],dias:Math.ceil((new Date(n.getFullYear(),n.getMonth()+1,1)-n)/864e5)};
 }
 // nome do local pelo OpenStreetMap (bairro ou rua), guardado no aparelho
@@ -1662,9 +1665,9 @@ async function publishMine(force){
   if(LS.get('comp',null)!=='sim'||!CFG.key)return;
   const runs=D.acts.filter(a=>isRun(a)&&AX[a.id]&&AX[a.id].map).slice(0,150).map(a=>({id:a.id,date:a.date.slice(0,10),dist:Math.round(a.dist||0),mov:a.mov,best:bestsOf(a,AX[a.id].best),map:trimTrack(AX[a.id].map)})).filter(r=>r.map);
   const foto=await fotoMini();
-  const sig=runs.length+'|'+(runs[0]&&runs[0].id)+'|'+runs.reduce((s,r)=>s+r.dist,0)+'|'+foto.length;
+  const xp=meuXp(),sig=runs.length+'|'+(runs[0]&&runs[0].id)+'|'+runs.reduce((s,r)=>s+r.dist,0)+'|'+foto.length+'|'+xp;
   if(!force&&sig===LS.get('pubh',''))return;
-  const r=await fetch(PUBURL+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({athlete:CFG.athlete,key:CFG.key,runs,foto})});
+  const r=await fetch(PUBURL+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({athlete:CFG.athlete,key:CFG.key,runs,foto,xp})});
   if(!r.ok)throw new Error('HTTP '+r.status);
   LS.set('pubh',sig);
 }
@@ -1775,7 +1778,7 @@ window.openPerfilAmigo=id=>{
   if(runs.length>=10)med.push('10 corridas');if(runs.length>=50)med.push('50 corridas');if(tot>=100000)med.push('100 km somados');if(tot>=500000)med.push('500 km somados');
   const lid=PLC.filter(p=>p.dono&&p.dono.id===id),ult=[...runs].sort((a,b)=>ds(b).localeCompare(ds(a))).slice(0,5),dd=x=>fmtD(x)+'/'+x.slice(2,4);
   openSheet(`<div class="hd"><b>PERFIL DO AMIGO</b><button class="b sm" onclick="closeSheet()">✕</button></div>
-  <div class="row" style="flex-wrap:nowrap;gap:12px;margin:4px 0 12px">${avatar({pic:frPic(id)},56)}<span><b style="display:block;font-size:17px">${esc(frNome(id))}</b><span class="meta">${esc(id)}${eAmigo?' · AMIGO':''}</span></span></div>
+  <div class="row" style="flex-wrap:nowrap;gap:12px;margin:4px 0 12px">${avatar({pic:frPic(id)},56)}<span><b style="display:block;font-size:17px">${esc(frNome(id))}</b><span class="meta">${u?`Nível ${nivelXp(xpDe(u)).L} · ${FAIXA[nivelXp(xpDe(u)).faixa]} · `:''}${esc(id)}${eAmigo?' · AMIGO':''}</span></span></div>
   ${u&&runs.length?`<div class="grid g3"><div class="cell"><div class="lbl">Este mês</div><span class="num">${km(kmM)}<small> km</small></span><div class="meta">${mes.length} ${mes.length===1?'corrida':'corridas'}</div></div>
   <div class="cell"><div class="lbl">Total no app</div><span class="num">${km(tot)}<small> km</small></span><div class="meta">${runs.length} corridas</div></div>
   <div class="cell"><div class="lbl">Locais 👑</div><span class="num">${lid.length}</span><div class="meta">que lidera</div></div></div>
@@ -1806,11 +1809,11 @@ window.openPlace=(i,d)=>{
   if(!PN[pl.key])placeName(pl).then(n=>{const e=$('#pl-nm');if(e&&CP.i===i)e.textContent=n});
 };
 window.openRank=()=>{
-  const {L,mes,dias}=ranking(),M=MODO(),meI=L.findIndex(x=>x.u.me),row=(x,j)=>`<div class="row" ${!x.u.me&&M==='a'?`onclick="openPerfilAmigo('${esc(x.u.id)}')" `:''}style="flex-wrap:nowrap;gap:10px;padding:10px 0;border-bottom:1px solid var(--line2)"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u,34)}<span style="flex:1;min-width:0"><b style="display:block;font-size:14px;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">${km(x.km*1000)} km · 👑 ${x.coroas}</span></span><span class="num" style="font-size:18px">${x.pts}<small class="dim"> pts</small></span></div>`;
+  const {L,mes,dias}=ranking(),M=MODO(),meI=L.findIndex(x=>x.u.me),row=(x,j)=>`<div class="row" ${!x.u.me&&M==='a'?`onclick="openPerfilAmigo('${esc(x.u.id)}')" `:''}style="flex-wrap:nowrap;gap:10px;padding:10px 0;border-bottom:1px solid var(--line2)"><span class="num" style="width:28px;text-align:center;font-size:${j<3?17:12}px">${medal(j)}</span>${avatar(x.u,34)}<span style="flex:1;min-width:0"><b style="display:block;font-size:14px;${x.u.me?'color:var(--blue)':''}">${esc(x.u.name)}</b><span class="meta">Nível ${nivelXp(x.u.me?meuXp():xpDe(x.u)).L} · ${km(x.km*1000)} km · 👑 ${x.coroas}</span></span><span class="num" style="font-size:18px">${x.pts}<small class="dim"> pts</small></span></div>`;
   const vis=L.map((x,j)=>[x,j]).filter(([x,j])=>j<10||x.u.me);
   openSheet(`<div class="hd"><b>${M==='a'?'RANKING DOS AMIGOS':'RANKING GERAL'}</b><button class="b sm" onclick="closeSheet()">✕</button></div>
   <div class="row" style="gap:6px"><span class="tag ok">TEMPORADA DE ${mes.toUpperCase()}</span><span class="tag">ZERA EM ${dias} ${dias===1?'DIA':'DIAS'}</span></div>
-  <p class="empty" style="margin-top:8px">Todo mês o placar volta a zero. Vale 1 ponto por km corrido no mês, mais um bônus pelas marcas do mês em cada local: 10 pontos para o 1º, 6 para o 2º, 3 para o 3º e 1 para os demais. 👑 é quantos locais a pessoa lidera.</p>
+  <p class="empty" style="margin-top:8px">Todo mês o placar volta a zero. Vale 1 ponto por km corrido no mês, 3 por treino (a partir de 1 km) e um bônus pelas marcas do mês em cada local: 10 pontos para o 1º, 6 para o 2º, 3 para o 3º e 1 para os demais. 👑 é quantos locais a pessoa lidera. Os pontos não se perdem: no fim do mês eles ficam na conta e sobem o seu nível.</p>
   <div class="card" style="padding:4px 12px;margin-top:10px">${vis.map(([x,j])=>row(x,j)).join('')}</div>
   ${L.length<2?`<p class="empty">Por enquanto só você aparece.${M==='a'?' Siga amigos em "+ AMIGOS" para disputar com eles.':' Quando mais gente entrar no ranking, aparece aqui sozinha.'}</p>`:''}`);
 };
@@ -1832,6 +1835,46 @@ window.compSet=async(v,upd)=>{
   rComp();
 };
 
+
+/* ================= níveis da conta: os pontos de cada temporada ficam guardados e sobem o nível =================
+   pontos: 1 por km corrido, 3 por treino (a partir de 1 km) e o bônus das marcas de cada mês em cada local (10, 6, 3 e 1).
+   Os níveis 1 a 5 são Iniciante, 6 a 10 Intermediário e 11 em diante Avançado. A curva sobe devagar: o 1º nível vem na 1ª semana,
+   o Intermediário em uns 4 meses de 3 treinos por semana, o Avançado em cerca de 1 ano de treino constante. */
+const NIVT=L=>L<=1?0:Math.round(25*Math.pow(L-1,1.8)); // pontos acumulados para chegar ao nível L
+const FAIXA=['Iniciante','Intermediário','Avançado'];
+const nivelXp=xp=>{let L=1;while(NIVT(L+1)<=xp)L++;return {L,base:NIVT(L),prox:NIVT(L+1),faixa:L<=5?0:L<=10?1:2}};
+let _bt=null;
+function bonusTodos(){ // bônus de marcas de cada atleta, mês a mês, com todo mundo que entrou no ranking
+  const k=D.at+'|'+PUBL.length;if(_bt&&_bt.k===k)return _bt.v;
+  const P=people(1),L=buildPlaces(P),meses=[...new Set(P.flatMap(u=>u.runs.map(r=>String(r.date).slice(0,7))))],B={};
+  for(const m of meses){const ini=m+'-01',fim=m+'-31';for(const pl of L)for(const [d] of pl.dists)board(pl,d,ini,fim).forEach((x,i)=>{B[x.u.id]=(B[x.u.id]||0)+([10,6,3][i]||1)})}
+  _bt={k,v:B};return B;
+}
+function meuXp(){ // todas as corridas (também as marcadas à mão) + o bônus das marcas
+  const runs=D.acts.filter(isRun),km=runs.reduce((s,r)=>s+(r.dist||0),0)/1000,tr=runs.filter(r=>(r.dist||0)>=1000).length;
+  return Math.round(km+3*tr+(bonusTodos()[CFG.athlete]||0));
+}
+function xpDe(u){ // de outra pessoa: o total que o app dela mandou; se não mandou, o que dá para calcular do que ela publicou
+  if(Number.isFinite(u.xp)&&u.xp>0)return u.xp;
+  const r=u.runs||[],km=r.reduce((s,x)=>s+(x.dist||0),0)/1000,tr=r.filter(x=>(x.dist||0)>=1000).length;
+  return Math.round(km+3*tr+(bonusTodos()[u.id]||0));
+}
+function checaNivel(){
+  if(!D.acts||!D.acts.length)return;const N=nivelXp(meuXp()),v=LS.get('nivelVisto',null);
+  if(v==null){LS.set('nivelVisto',N.L);return}
+  if(N.L>v){LS.set('nivelVisto',N.L);toast(`🎉 VOCÊ SUBIU PARA O NÍVEL ${N.L} · ${FAIXA[N.faixa].toUpperCase()}`,4500)}
+}
+const nivelCard=()=>{const XP=meuXp(),N=nivelXp(XP),pct=Math.min(100,(XP-N.base)/((N.prox-N.base)||1)*100);
+  return `<div class="card tap" onclick="openNiveis()"><div class="row" style="flex-wrap:nowrap;gap:14px"><div class="lvl">${N.L}</div><div style="flex:1;min-width:0"><b style="font-size:17px;color:var(--hi)">Nível ${N.L} · ${FAIXA[N.faixa]}</b><div class="meta">${XP} pontos · faltam ${N.prox-XP} para o nível ${N.L+1}</div><div class="bar"><i style="width:${pct}%"></i></div></div><span class="dim" style="font-size:18px">›</span></div></div>`};
+window.openNiveis=()=>{
+  const XP=meuXp(),N=nivelXp(XP),rows=[];
+  for(let L=1;L<=16;L++){const f=L<=5?0:L<=10?1:2;rows.push(`<tr style="${L===N.L?'color:var(--blue);font-weight:700':''}"><td>Nível ${L}${L===N.L?' · você':''}</td><td style="font-family:var(--f)">${FAIXA[f]}</td><td class="r">${NIVT(L)}</td></tr>`)}
+  openSheet(`<div class="hd"><b>NÍVEL DA CONTA</b><button class="b sm" onclick="closeSheet()">✕</button></div>
+  <div class="row" style="flex-wrap:nowrap;gap:14px;margin:4px 0 12px"><div class="lvl">${N.L}</div><div><b style="font-size:18px;color:var(--hi)">Nível ${N.L} · ${FAIXA[N.faixa]}</b><div class="meta">${XP} pontos acumulados</div></div></div>
+  <p class="empty" style="color:var(--txt)">O ranking zera todo mês, mas os pontos não se perdem: eles ficam na sua conta e sobem o seu nível.</p>
+  <div class="card" style="margin-top:10px"><div class="lbl">COMO GANHAR PONTOS</div><table style="margin-top:6px"><tr><td style="font-family:var(--f)">Cada km corrido</td><td class="r">1</td></tr><tr><td style="font-family:var(--f)">Cada treino (a partir de 1 km)</td><td class="r">3</td></tr><tr><td style="font-family:var(--f)">Marca do mês num local: 1º, 2º, 3º, demais</td><td class="r">10 · 6 · 3 · 1</td></tr></table></div>
+  <div class="card"><div class="lbl">NÍVEIS</div><table style="margin-top:6px"><tr><th>Nível</th><th>Faixa</th><th class="r">Pontos</th></tr>${rows.join('')}</table><p class="meta" style="margin-top:8px">Depois do 16, os níveis continuam subindo.</p></div>`);
+};
 /* ================= foto de perfil ================= */
 window.pickFoto=()=>{
   const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
