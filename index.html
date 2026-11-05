@@ -775,7 +775,7 @@ function rIni(){
   const w=r.w,vo2=[...D.well].reverse().find(x=>x.vo2);
   let h='';
   // a conexão foi recusada (chave trocada ou acesso revogado): mostra o caminho para entrar de novo
-  if(LS.get('authRuim',0))h+=`<div class="card alert"><div class="lbl bad">O INTERVALS NÃO ACEITOU A CONEXÃO</div><p class="empty" style="margin-top:4px">A chave ou o acesso deixou de valer. Entre de novo com a sua conta; as suas corridas continuam lá.</p><button class="b pri full" style="margin-top:10px" onclick="entrarIntervals()">Entrar com o Intervals</button></div>`;
+  if(LS.get('authRuim',0))h+=`<div class="card alert"><div class="lbl bad">O INTERVALS NÃO ACEITOU A CONEXÃO</div><p class="empty" style="margin-top:4px">A chave ou o acesso deixou de valer. Entre de novo com a sua conta; as suas corridas continuam lá.</p><button class="b pri full" style="margin-top:10px" onclick="entrarIntervals()">Entrar com o Intervals</button><button class="b full" style="margin-top:8px" onclick="sairConta()">Sair da conta</button></div>`;
   if(!LS.get('guia'))h+=`<div class="card cur"><div class="lbl" style="color:var(--blue)">COMO USAR</div><p class="empty" style="margin-top:4px">Toque no <b style="color:var(--hi)">?</b> ao lado de cada título para ver o que o número significa. Os cartões de sono, VO2 e FC abrem um resumo com o histórico.</p><button class="b sm pri" style="margin-top:8px" onclick="LS.set('guia',1);render()">Entendi</button></div>`;
   if(D.athlete&&!D.athlete.gAct&&hasWatch())h+=`<div class="card alert"><div class="lbl bad">ALERTA // SINCRONIZAÇÃO</div><p class="empty" style="margin-top:4px">As corridas do Garmin não estão chegando ao Intervals.icu (último treino recebido: ${last?last.date.slice(0,10).split('-').reverse().join('/'):'nenhum'}). Veja MAIS → Dispositivos.</p></div>`;
   // resultado do teste de 1 km ainda não aplicado
@@ -1061,7 +1061,7 @@ function rMais(){
   if(SIMPLES())h=h.slice(0,mA);
   h+=`<div class="sec">CONEXÃO</div><div class="card ${temConta()?'':'alert'}"><div class="row" style="justify-content:space-between"><b style="color:var(--hi)">Intervals.icu</b>${temConta()?'<span class="tag ok">CONECTADO</span>':'<span class="tag bad">NÃO CONECTADO</span>'}</div>
   <p class="empty" style="margin-top:6px">${CFG.token?'Conectado pelo login do Intervals. O app não guarda a sua senha.':CFG.key?'Conectado pelo ID e pela chave de API.':'Entre com a sua conta do Intervals para o app ler as suas corridas e mandar os treinos.'}</p>
-  ${CFG.token?'<button class="b full" style="margin-top:10px" onclick="sairIntervals()">Sair da conta do Intervals</button>':'<button class="b pri full" style="margin-top:10px" onclick="entrarIntervals()">Entrar com o Intervals</button>'}
+  ${CFG.token?'':'<button class="b pri full" style="margin-top:10px" onclick="entrarIntervals()">Entrar com o Intervals</button>'}${temConta()?'<button class="b red full" style="margin-top:10px" onclick="sairConta()">Sair da conta</button>':''}
   <details style="margin-top:10px"><summary class="meta" style="cursor:pointer">Usar o ID e a chave de API</summary>${connForm('saveConn()','Salvar e sincronizar')}</details></div>
   <div class="sec">SOBRE</div><div class="card"><p class="empty">Coach: por enquanto a leitura e os ajustes são calculados no próprio app (carga pela FC, forma, fadiga, VDOT, deriva cardíaca). A conexão com o Claude pela API da Anthropic entra na próxima fase, por um servidor próprio, para a chave não ficar no celular.</p><p class="empty" style="margin-top:8px"><a href="privacidade.html" target="_blank" rel="noopener" style="color:var(--blue)">Política de privacidade</a></p></div>`;
   $('#mais').innerHTML=h;
@@ -1111,6 +1111,7 @@ function rPerf(){
   const BL=badgeList(),sorted=[...BL.filter(b=>b.on),...BL.filter(b=>!b.on)];
   h+=`<div class="sec">CONQUISTAS<small>${BL.filter(b=>b.on).length}/${BL.length}</small></div><div class="grid g3">${sorted.slice(0,6).map(badgeHtml).join('')}</div><button class="b more" onclick="openBadges()">Ver todas as conquistas</button>`;
   h+=`<div class="sec">REGISTRO DE ATIVIDADES<small>${D.acts.length}</small></div><div class="card list">${D.acts.slice(0,LIM).map(x=>`<div class="it" onclick="openAct('${x.id}')"><div class="ic">${typeIc(x)}</div><div class="t"><b>${esc(x.name)}</b><span class="meta">${x.date.slice(8,10)}/${x.date.slice(5,7)}/${x.date.slice(2,4)} · ${fmtT(x.mov)}</span></div><div class="v">${x.dist?km(x.dist)+' km':''}<br><span class="dim">${isRun(x)&&x.dist?fmtP(x.mov/x.dist*1000)+'/km':x.hr?x.hr+' bpm':''}</span></div></div>`).join('')||'<p class="empty">Sem atividades.</p>'}</div>${D.acts.length>LIM?`<button class="b more" onclick="verMais()">Ver mais (${Math.min(8,D.acts.length-LIM)} de ${D.acts.length-LIM} restantes)</button>`:''}`;
+  if(temConta())h+=`<button class="b red full" style="margin-top:18px" onclick="sairConta()">Sair da conta</button>`;
   $('#perf').innerHTML=h;
 }
 
@@ -1302,10 +1303,16 @@ async function voltaOAuth(){
   }catch(e){toast('NÃO DEU PARA ENTRAR // '+e.message,4500);render()}
   return true;
 }
-window.sairIntervals=async()=>{
-  if(!confirm('Sair da conta do Intervals neste aparelho? Para voltar, é só entrar de novo.'))return;
-  try{await fetch(API+'/disconnect-app',{method:'DELETE',headers:{Authorization:authH()}})}catch(e){}
-  CFG.token='';CFG.athlete='';saveCfg();toast('VOCÊ SAIU DO INTERVALS');render();
+window.sairIntervals=()=>sairConta();
+window.sairConta=async()=>{
+  const pend=(D.acts||[]).filter(a=>a.gpx&&isMan(a)).length;
+  if(!confirm('Sair da conta neste aparelho? Os dados desta conta saem do celular; as suas corridas continuam no Intervals e você pode entrar de novo quando quiser.'+(pend?`\n\nAtenção: ${pend} ${pend===1?'corrida gravada ainda não foi enviada':'corridas gravadas ainda não foram enviadas'} ao Intervals e ${pend===1?'será apagada':'serão apagadas'}.`:'')))return;
+  if(CFG.token){try{await fetch(API+'/disconnect-app',{method:'DELETE',headers:{Authorization:authH()}})}catch(e){}}
+  const tema=localStorage.getItem('br.tema');
+  Object.keys(localStorage).filter(k=>k.startsWith('br.')).forEach(k=>localStorage.removeItem(k));
+  if(tema)localStorage.setItem('br.tema',tema);
+  localStorage.setItem('br.cfg',JSON.stringify({athlete:'',key:'',token:''})); // não volta a usar a chave de teste do computador
+  location.replace(redirUri());
 };
 
 /* ================= conexão com o Intervals (assistente passo a passo) ================= */
