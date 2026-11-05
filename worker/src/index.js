@@ -3,6 +3,7 @@
 // Amigos: pedido por ID do Intervals, que só vale depois que o outro aceita (guardado em 'f:<id>').
 // A chave do Intervals só serve para provar que o atleta é quem diz ser: é conferida no Intervals e descartada, nunca é gravada.
 
+const OAUTH_ID = '1688'; // ID público do app no Intervals (não é segredo)
 const ORIGENS = ['https://igordejesusp.github.io', 'http://localhost:8768'];
 const MAXPED = 100; // pedidos pendentes por pessoa
 const LIMITE = 400_000; // tamanho máximo do resumo de um atleta (bytes)
@@ -20,10 +21,11 @@ const json = (req, obj, status = 200, extra = {}) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', ...cors(req), ...extra } });
 
 // confere no Intervals se a chave pertence ao atleta
-async function confere(athlete, key) {
-  if (!/^i\d{1,12}$/.test(athlete || '') || !key) return null;
+// aceita os dois jeitos: chave de API (Basic) ou o token do login do Intervals (Bearer)
+async function confere(athlete, key, token) {
+  if (!/^i\d{1,12}$/.test(athlete || '') || !(key || token)) return null;
   const r = await fetch(`https://intervals.icu/api/v1/athlete/${athlete}`, {
-    headers: { Authorization: 'Basic ' + btoa('API_KEY:' + key) },
+    headers: { Authorization: token ? 'Bearer ' + token : 'Basic ' + btoa('API_KEY:' + key) },
   });
   if (!r.ok) return null;
   const a = await r.json();
@@ -99,7 +101,7 @@ export default {
       if (txt.length > LIMITE) return json(req, { erro: 'resumo grande demais' }, 413);
       let b;
       try { b = JSON.parse(txt); } catch (e) { return json(req, { erro: 'json inválido' }, 400); }
-      const a = await confere(b.athlete, b.key);
+      const a = await confere(b.athlete, b.key, b.token);
       if (!a) return json(req, { erro: 'chave não confere com o atleta' }, 403);
 
       if (req.method === 'DELETE') {
@@ -115,15 +117,25 @@ export default {
       return json(req, { ok: true, runs: runs.length });
     }
 
+    // reserva do login: só repassa a troca do código ao Intervals (cliente público, sem senha do app)
+    if (req.method === 'POST' && url.pathname === '/oauth/token') {
+      let b;
+      try { b = JSON.parse(await req.text()); } catch (e) { return json(req, { erro: 'json inválido' }, 400); }
+      if (String(b.client_id) !== OAUTH_ID || !b.code || !b.code_verifier) return json(req, { erro: 'pedido inválido' }, 400);
+      const f = new URLSearchParams({ client_id: OAUTH_ID, code: b.code, code_verifier: b.code_verifier, redirect_uri: b.redirect_uri || '', grant_type: 'authorization_code' });
+      const r = await fetch('https://intervals.icu/api/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: f });
+      return new Response(await r.text(), { status: r.status, headers: { 'Content-Type': 'application/json', ...cors(req) } });
+    }
+
     if (req.method === 'POST' && url.pathname === '/amigos') {
       let b;
       try { b = JSON.parse(await req.text()); } catch (e) { return json(req, { erro: 'json inválido' }, 400); }
-      const a = await confere(b.athlete, b.key);
+      const a = await confere(b.athlete, b.key, b.token);
       if (!a) return json(req, { erro: 'chave não confere com o atleta' }, 403);
       const r = await amigos(env, b.athlete, b.acao || 'lista', b.alvo);
       return json(req, r, r.erro ? 400 : 200);
     }
 
-    return json(req, { app: 'Boonie Run', rotas: ['GET /all', 'POST /publish', 'DELETE /me', 'POST /amigos'] });
+    return json(req, { app: 'Boonie Run', rotas: ['GET /all', 'POST /publish', 'DELETE /me', 'POST /amigos', 'POST /oauth/token'] });
   },
 };

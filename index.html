@@ -343,14 +343,18 @@ const isRun=a=>/Run/.test(a.type||'');
 const gen=w=>(D.athlete||{}).sex==='F'?({'ÓTIMO':'ÓTIMA','BOM':'BOA','BAIXO':'BAIXA','ótimo':'ótima','bom':'boa','baixo':'baixa'}[w]||w):w;
 
 /* ================= config ================= */
-const CFG=Object.assign({athlete:'',key:'',fcmax:194,fcrep:52,limiar:300,longDay:0},window.LOCAL_CFG||{},LS.get('cfg',{}));
+const CFG=Object.assign({athlete:'',key:'',token:'',fcmax:194,fcrep:52,limiar:300,longDay:0},window.LOCAL_CFG||{},LS.get('cfg',{}));
 function saveCfg(){LS.set('cfg',CFG)}
+// conta ligada: pelo login do Intervals (token) ou pelo jeito antigo (ID + chave de API)
+const temConta=()=>!!(CFG.athlete&&(CFG.token||CFG.key));
+const authH=()=>CFG.token?'Bearer '+CFG.token:authH();
+const credSrv=()=>CFG.token?{athlete:CFG.athlete,token:CFG.token}:{athlete:CFG.athlete,key:CFG.key};
 
 /* ================= Intervals.icu ================= */
 const API='https://intervals.icu/api/v1';
 async function api(path,opt={}){
-  if(!CFG.athlete||!CFG.key)throw new Error('SEM CHAVE');
-  const r=await fetch(API+path,{...opt,headers:{Authorization:'Basic '+btoa('API_KEY:'+CFG.key),'Content-Type':'application/json',...(opt.headers||{})}});
+  if(!temConta())throw new Error('SEM CHAVE');
+  const r=await fetch(API+path,{...opt,headers:{Authorization:authH(),'Content-Type':'application/json',...(opt.headers||{})}});
   if(!r.ok)throw new Error('HTTP '+r.status);
   const t=await r.text();return t?JSON.parse(t):null;
 }
@@ -766,7 +770,7 @@ const SIMPLES=()=>{const v=LS.get('simples',null);if(v!=null)return !!v;return !
 window.setSimples=v=>{LS.set('simples',v?1:0);toast(v?'MODO SIMPLES':'MODO COMPLETO');render()};
 function rIni(){
   const el=$('#ini');
-  if(!CFG.key){el.innerHTML=`<div class="sec">CONFIGURAÇÃO</div><div class="card alert"><h2>Sem conexão com o Intervals.icu</h2><p class="empty">Abra MAIS → Conexão e cole o Athlete ID e a chave de API.</p></div>`;return}
+  if(!temConta()){el.innerHTML=`<div class="sec">CONFIGURAÇÃO</div><div class="card alert"><h2>Sem conexão com o Intervals.icu</h2><p class="empty">Toque no botão abaixo para entrar com a sua conta.</p><button class="b pri full" style="margin-top:10px" onclick="entrarIntervals()">Entrar com o Intervals</button></div>`;return}
   const t=TODAY(),ds=ymd(t),r=readiness(t),last=D.acts.find(isRun),S=pmc(),cur=S[S.length-1];
   const w=r.w,vo2=[...D.well].reverse().find(x=>x.vo2);
   let h='';
@@ -1053,7 +1057,10 @@ function rMais(){
   <table style="margin-top:10px"><tr><th>Zona</th><th class="r">FC</th></tr>${z.map((v,i)=>`<tr><td style="font-family:var(--f)">${zn[i]}</td><td class="r">${i?z[i-1]+1:0}–${v}</td></tr>`).join('')}</table>
   <p class="empty" style="margin-top:8px">As zonas vêm do Intervals.icu. Para mudar, edite lá (Configurações → Corrida) e sincronize.</p></div>`;
   if(SIMPLES())h=h.slice(0,mA);
-  h+=`<div class="sec">CONEXÃO</div><details class="card" ${CFG.key?'':'open'}><summary><span>Intervals.icu</span>${CFG.key?'<span class="tag ok">CONECTADO</span>':'<span class="tag bad">SEM CHAVE</span>'}</summary>${connForm('saveConn()','Salvar e sincronizar')}</details>
+  h+=`<div class="sec">CONEXÃO</div><div class="card ${temConta()?'':'alert'}"><div class="row" style="justify-content:space-between"><b style="color:var(--hi)">Intervals.icu</b>${temConta()?'<span class="tag ok">CONECTADO</span>':'<span class="tag bad">NÃO CONECTADO</span>'}</div>
+  <p class="empty" style="margin-top:6px">${CFG.token?'Conectado pelo login do Intervals. O app não guarda a sua senha.':CFG.key?'Conectado pelo ID e pela chave de API.':'Entre com a sua conta do Intervals para o app ler as suas corridas e mandar os treinos.'}</p>
+  ${CFG.token?'<button class="b full" style="margin-top:10px" onclick="sairIntervals()">Sair da conta do Intervals</button>':'<button class="b pri full" style="margin-top:10px" onclick="entrarIntervals()">Entrar com o Intervals</button>'}
+  <details style="margin-top:10px"><summary class="meta" style="cursor:pointer">Usar o ID e a chave de API</summary>${connForm('saveConn()','Salvar e sincronizar')}</details></div>
   <div class="sec">SOBRE</div><div class="card"><p class="empty">Coach: por enquanto a leitura e os ajustes são calculados no próprio app (carga pela FC, forma, fadiga, VDOT, deriva cardíaca). A conexão com o Claude pela API da Anthropic entra na próxima fase, por um servidor próprio, para a chave não ficar no celular.</p><p class="empty" style="margin-top:8px"><a href="privacidade.html" target="_blank" rel="noopener" style="color:var(--blue)">Política de privacidade</a></p></div>`;
   $('#mais').innerHTML=h;
   if($('#c-go'))connStatus();
@@ -1148,9 +1155,9 @@ function mergeLaps(L){
   return out.length>=2?out.map(e=>({idx:e.idx,d:Math.round(e.d),t:Math.round(e.t*10)/10,hr:e.hr!=null?Math.round(e.hr):null,hm:e.hm})):null;
 }
 async function loadEtapas(id){
-  const x=AX[id];if(!x||!CFG.key)return;
+  const x=AX[id];if(!x||!temConta())return;
   try{
-    const r=await fetch(`${API}/activity/${id}/file`,{headers:{Authorization:'Basic '+btoa('API_KEY:'+CFG.key)}});
+    const r=await fetch(`${API}/activity/${id}/file`,{headers:{Authorization:authH()}});
     if(r.ok){const L=fitLaps(await r.arrayBuffer());x.etapas=L?mergeLaps(L):null}
     else x.etapas=null; // sem arquivo (ex.: corrida vinda do Strava)
     LS.set('ax5',AX);
@@ -1184,7 +1191,7 @@ function etapasHtml(E,a){
 window.openAct=async id=>{
   const a=D.acts.find(x=>x.id===id);if(!a)return;
   if(a.dist&&!AX[id]&&!isMan(a)){openSheet('<p class="empty">Carregando parciais…</p>');try{await loadAX(id);LS.set('ax5',AX)}catch(e){}}
-  if(isRun(a)&&!isMan(a)&&AX[id]&&AX[id].etapas===undefined&&CFG.key){openSheet('<p class="empty">Carregando etapas…</p>');await loadEtapas(id)}
+  if(isRun(a)&&!isMan(a)&&AX[id]&&AX[id].etapas===undefined&&temConta()){openSheet('<p class="empty">Carregando etapas…</p>');await loadEtapas(id)}
   const x=AX[id]||{},pace=a.dist?a.mov/a.dist*1000:null;
   let h=`<div class="hd"><b>${typeIc(a)} // ${a.date.slice(8,10)}/${a.date.slice(5,7)}/${a.date.slice(0,4)}</b><button class="b sm" onclick="closeSheet()">✕</button></div><h2 style="font-size:17px">${esc(a.name)}</h2><div class="meta">${a.date.slice(11,16)} · ${esc(a.src||'')}</div>${x.map?mapBox(id,220)+`<button class="b full" style="margin-top:8px" onclick="openCartao('${id}')">Compartilhar treino</button>`:''}
   <div class="grid g3" style="margin-top:10px"><div class="cell"><div class="lbl">Dist.</div><span class="num">${km(a.dist)}<small> km</small></span></div><div class="cell"><div class="lbl">Tempo</div><span class="num">${fmtT(a.mov)}</span></div><div class="cell"><div class="lbl">Ritmo</div><span class="num">${fmtP(pace)}</span></div><div class="cell"><div class="lbl">FC méd</div><span class="num">${a.hr||'--'}</span></div><div class="cell"><div class="lbl">FC máx</div><span class="num">${a.hrmax||'--'}</span></div><div class="cell"><div class="lbl">Carga</div><span class="num">${Math.round(loadOf(a))}</span></div><div class="cell"><div class="lbl">Altimetria</div><span class="num">${a.elev!=null?Math.round(a.elev)+'<small> m</small>':'--'}</span></div><div class="cell"><div class="lbl">Cadência</div><span class="num">${a.cad?Math.round(a.cad*2):'--'}</span></div><div class="cell"><div class="lbl">Deriva FC</div><span class="num">${x.dec!=null?x.dec+'%':'--'}</span></div></div>`;
@@ -1254,6 +1261,51 @@ window.cartSave=async()=>{const b=await cartBlob();if(!b)return toast('NÃO FOI 
 window.cartShare=async()=>{const b=await cartBlob();if(!b)return toast('NÃO FOI POSSÍVEL GERAR A IMAGEM');const f=new File([b],'boonie-run.png',{type:'image/png'});
   if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:'Boonie Run'})}catch(e){}}else cartSave()};
 
+/* ================= entrar com o Intervals (OAuth com PKCE) =================
+   o app manda a pessoa ao Intervals, ela entra (ou cria a conta) e autoriza; o Intervals devolve um código
+   que o próprio app troca por um token. Cliente público com PKCE: nenhuma senha do app fica no código. */
+const OAUTH={id:'1688',auth:'https://intervals.icu/oauth/authorize',token:'https://intervals.icu/api/oauth/token',
+  scope:'ACTIVITY:WRITE,WELLNESS:READ,CALENDAR:WRITE,SETTINGS:READ'};
+const redirUri=()=>location.origin+location.pathname;
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+window.entrarIntervals=async()=>{
+  if(!/^\d+$/.test(OAUTH.id))return toast('O LOGIN DO INTERVALS AINDA ESTÁ SENDO CONFIGURADO',3500);
+  const v=b64u(crypto.getRandomValues(new Uint8Array(48))),st=b64u(crypto.getRandomValues(new Uint8Array(16)));
+  const ch=b64u(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));
+  LS.set('oauth',{v,st,rel:OB.relogio||(OB.a&&OB.a.relogio)||null,t:Date.now()});
+  location.href=OAUTH.auth+'?'+new URLSearchParams({client_id:OAUTH.id,redirect_uri:redirUri(),response_type:'code',scope:OAUTH.scope,state:st,code_challenge:ch,code_challenge_method:'S256'});
+};
+async function trocaCodigo(body){
+  try{const r=await fetch(OAUTH.token,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)});
+    return {ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}}
+  catch(e){ // se o navegador bloquear a chamada direta, o servidor do app só repassa (não tem senha nenhuma)
+    const r=await fetch(PUBURL+'/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return {ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}}
+}
+async function voltaOAuth(){
+  const q=new URLSearchParams(location.search);if(!q.get('code')&&!q.get('error'))return false;
+  history.replaceState(null,'',redirUri());
+  const o=LS.get('oauth',null);LS.set('oauth',null);
+  if(q.get('error')){toast('ENTRADA CANCELADA NO INTERVALS',3000);return true}
+  if(!o||o.st!==q.get('state')||Date.now()-o.t>15*60e3){toast('NÃO DEU PARA ENTRAR. TENTE DE NOVO',3500);return true}
+  try{
+    const R=await trocaCodigo({client_id:OAUTH.id,code:q.get('code'),code_verifier:o.v,redirect_uri:redirUri(),grant_type:'authorization_code'});
+    if(!R.ok||!R.j.access_token)throw new Error(R.j.error_description||R.j.error||('HTTP '+R.status));
+    let id=String((R.j.athlete&&R.j.athlete.id)||'');if(/^\d+$/.test(id))id='i'+id;
+    CFG.token=R.j.access_token;CFG.key='';if(id)CFG.athlete=id;saveCfg();
+    if(!CFG.athlete){const a=await api('/athlete/0');CFG.athlete=a.id;saveCfg()}
+    OB={i:0,a:null,relogio:o.rel,skipRel:!!o.rel};
+    toast('CONECTADO // '+((R.j.athlete&&R.j.athlete.name)||''),2500);
+    await sync(0);
+  }catch(e){toast('NÃO DEU PARA ENTRAR // '+e.message,4500);render()}
+  return true;
+}
+window.sairIntervals=async()=>{
+  if(!confirm('Sair da conta do Intervals neste aparelho? Para voltar, é só entrar de novo.'))return;
+  try{await fetch(API+'/disconnect-app',{method:'DELETE',headers:{Authorization:authH()}})}catch(e){}
+  CFG.token='';CFG.athlete='';saveCfg();toast('VOCÊ SAIU DO INTERVALS');render();
+};
+
 /* ================= conexão com o Intervals (assistente passo a passo) ================= */
 // reconhece o ID (i + números) e a chave (texto longo) mesmo colados juntos, com "API_KEY:" ou com espaços
 function parseConn(txt){
@@ -1294,10 +1346,10 @@ const connForm=(fn,label)=>`<button class="b full" style="margin-top:4px" onclic
   <p class="empty" id="c-st" style="min-height:18px;margin-top:8px"></p><button class="b pri full" id="c-go" onclick="${fn}" disabled>${label}</button>`;
 // confere no Intervals antes de guardar; devolve o atleta ou null (e explica o erro na tela)
 async function connTry(){
-  const v=connVals(),st=$('#c-st'),go=$('#c-go'),old=go.textContent,bk=[CFG.athlete,CFG.key];
-  go.disabled=true;go.textContent='Conferindo…';CFG.athlete=v.id;CFG.key=v.key;
+  const v=connVals(),st=$('#c-st'),go=$('#c-go'),old=go.textContent,bk=[CFG.athlete,CFG.key,CFG.token];
+  go.disabled=true;go.textContent='Conferindo…';CFG.athlete=v.id;CFG.key=v.key;CFG.token='';
   try{return await api('/athlete/'+v.id)}
-  catch(e){CFG.athlete=bk[0];CFG.key=bk[1];
+  catch(e){CFG.athlete=bk[0];CFG.key=bk[1];CFG.token=bk[2];
     st.innerHTML='<span class="bad">'+(/HTTP 40[13]/.test(e.message)?'O Intervals não aceitou esse ID com essa chave. Copie a chave de novo, inteira, e confira o ID.'
       :/HTTP 404/.test(e.message)?'Não achei esse ID no Intervals. Ele começa com i, seguido só de números.':'Sem conexão com o Intervals. Confira a internet e tente de novo.')+'</span>';
     go.textContent=old;go.disabled=false;return null}
@@ -1316,25 +1368,28 @@ function histo(){
   return {n:r.length,w4,L,V:V&&V.v};
 }
 function obInit(){const H=histo();OB.a={relogio:OB.relogio||null,meta:null,dias:[2,4,0],longo:0,km0:H.n?(H.w4<1?0:H.w4<10?7:H.w4<20?15:H.w4<35?27:40):null,t5:null,H}}
-const CONNTXT={garmin:'Conecte o Intervals.icu: é ele que manda os treinos para o seu Garmin e traz as suas corridas de volta. São 3 passos.',
-  outro:'O Intervals.icu é o site gratuito que guarda as suas corridas e conversa com vários relógios. Confira nas dúvidas abaixo se o seu aparece por lá. São 3 passos.',
-  nenhum:'Sem relógio, o Intervals.icu serve só de arquivo: é onde ficam guardadas as corridas que você grava pelo app. É gratuito e leva uns 3 minutos. São 3 passos.'};
-const OBS=[{id:'relogio',show:()=>!OB.skipRel},{id:'conn',show:()=>!CFG.key},{id:'oi'},{id:'meta'},{id:'dias'},{id:'longo'},{id:'km0'},{id:'t5',show:()=>!!OB.a&&!OB.a.H.V},{id:'fim'}];
+const CONNTXT={garmin:'Conecte o Intervals.icu: é ele que manda os treinos para o seu Garmin e traz as suas corridas de volta.',
+  outro:'O Intervals.icu é o site gratuito que guarda as suas corridas e conversa com vários relógios. Confira nas dúvidas abaixo se o seu aparece por lá.',
+  nenhum:'Sem relógio, o Intervals.icu serve só de arquivo: é onde ficam guardadas as corridas que você grava pelo app. É gratuito e leva uns 3 minutos.'};
+const OBS=[{id:'relogio',show:()=>!OB.skipRel},{id:'conn',show:()=>!temConta()},{id:'oi'},{id:'meta'},{id:'dias'},{id:'longo'},{id:'km0'},{id:'t5',show:()=>!!OB.a&&!OB.a.H.V},{id:'fim'}];
 function obPF(){
   const a=OB.a,H=a.H,km0=a.km0||0,L0=H.L>=1?H.L:{0:0,7:3,15:5,27:8,40:12}[km0];
   const V=H.V||vdot(5000,a.t5||(km0?2100:2700));
   return {relogio:a.relogio,meta:a.meta,dias:a.dias,longo:a.longo,km0,L0:r5(L0),V:Math.round(V*10)/10,Vsrc:H.V?'historico':'chute',inicio:ymd(addD(TODAY(),1))};
 }
 function rOB(){
-  const el=$('#ini');if(CFG.key&&!OB.a)obInit();
+  const el=$('#ini');if(temConta()&&!OB.a)obInit();
   const st=OBS.filter(s=>!s.show||s.show());OB.i=clamp(OB.i,0,st.length-1);const s=st[OB.i],a=OB.a||{relogio:OB.relogio};
   const q=v=>typeof v==='string'?`'${v}'`:v;
   const o=(k,v,t,sub)=>`<button class="opt ${a[k]===v?'on':''}" onclick="obSet('${k}',${q(v)})"><span>${t}${sub?`<small>${sub}</small>`:''}</span></button>`;
-  let h=s.id==='conn'?'':`<div class="row" style="justify-content:space-between;margin-bottom:8px">${OB.i>(CFG.key?0:1)?`<button class="b sm" onclick="obGo(-1)">◀ Voltar</button>`:OB.force?`<button class="b sm" onclick="obCancel()">Cancelar</button>`:'<span></span>'}<span class="meta">${OB.i+1} de ${st.length}</span></div><div class="bar" style="margin-bottom:18px"><i style="width:${(OB.i+1)/st.length*100}%"></i></div>`;
-  if(s.id==='conn')h+=`<button class="b sm" onclick="obGo(-1)">◀ Voltar</button><div class="obh" style="margin-top:12px">Conecte o Intervals.icu</div><p class="obp">${CONNTXT[a.relogio]||'Conecte a sua conta do Intervals.icu, o site gratuito onde ficam as suas corridas. São 3 passos.'}</p>
-    <div class="card"><div class="cs"><i>1</i><div><b>Tenha uma conta no Intervals</b><p class="empty">O cadastro é gratuito. Já tem conta? Pule para o passo 2.</p></div></div><a class="b full" href="https://intervals.icu/" target="_blank" rel="noopener">Abrir o Intervals.icu</a></div>
+  let h=s.id==='conn'?'':`<div class="row" style="justify-content:space-between;margin-bottom:8px">${OB.i>(temConta()?0:1)?`<button class="b sm" onclick="obGo(-1)">◀ Voltar</button>`:OB.force?`<button class="b sm" onclick="obCancel()">Cancelar</button>`:'<span></span>'}<span class="meta">${OB.i+1} de ${st.length}</span></div><div class="bar" style="margin-bottom:18px"><i style="width:${(OB.i+1)/st.length*100}%"></i></div>`;
+  if(s.id==='conn')h+=`<button class="b sm" onclick="obGo(-1)">◀ Voltar</button><div class="obh" style="margin-top:12px">Conecte o Intervals.icu</div><p class="obp">${CONNTXT[a.relogio]||'Conecte a sua conta do Intervals.icu, o site gratuito onde ficam as suas corridas.'}</p>
+    <button class="b pri full" style="min-height:56px;font-size:16px" onclick="entrarIntervals()">Entrar com o Intervals</button>
+    <p class="meta" style="margin:8px 0 16px;text-align:center;line-height:1.5">Você entra com a sua conta do Intervals, ou cria uma de graça na hora, e autoriza o app. Não precisa copiar chave nenhuma.</p>
+    <details class="card"><summary><span>Prefiro colar o ID e a chave</span></summary><div style="margin-top:10px"><div class="card"><div class="cs"><i>1</i><div><b>Tenha uma conta no Intervals</b><p class="empty">O cadastro é gratuito. Já tem conta? Pule para o passo 2.</p></div></div><a class="b full" href="https://intervals.icu/" target="_blank" rel="noopener">Abrir o Intervals.icu</a></div>
     <div class="card"><div class="cs"><i>2</i><div><b>Copie o ID e a chave</b><p class="empty">No Intervals, abra <b>Settings</b> e desça até <b>Developer Settings</b>. Copie o <b>Athlete ID</b> (começa com i). Se ainda não houver uma <b>API Key</b>, crie e copie também.</p></div></div><a class="b full" href="https://intervals.icu/settings" target="_blank" rel="noopener">Abrir as configurações</a></div>
     <div class="card cur"><div class="cs"><i>3</i><div><b>Cole aqui</b><p class="empty">Volte ao app e toque em Colar. Se copiou o ID e a chave em momentos diferentes, cole um de cada vez.</p></div></div>${connForm('obConn()','Conectar')}</div>
+    </div></details>
     <details class="card"><summary><span>Dúvidas frequentes</span></summary>
     <p class="empty" style="margin-top:8px"><b style="color:var(--hi)">Preciso pagar?</b> O cadastro no Intervals é gratuito.</p>
     <p class="empty" style="margin-top:8px"><b style="color:var(--hi)">Para que serve a chave?</b> Ela deixa o Boonie Run ler as suas corridas e enviar treinos para a sua conta do Intervals. Fica guardada só neste aparelho.</p>
@@ -1344,7 +1399,7 @@ function rOB(){
     h+=`<div class="obh">Vamos montar o seu plano${nm?', '+esc(nm):''}</div><p class="obp">São poucas perguntas rápidas. Com as respostas e o seu histórico, o app monta os treinos semana a semana.</p>
     ${H.n?`<div class="card"><div class="lbl">Seu histórico no Intervals</div><div class="grid g3" style="margin-top:6px"><div class="cell"><div class="lbl">Corridas</div><span class="num">${H.n}</span></div><div class="cell"><div class="lbl">Km/semana</div><span class="num">${H.w4.toFixed(1)}</span><div class="meta">últ. 4 sem.</div></div><div class="cell"><div class="lbl">Maior</div><span class="num">${H.L.toFixed(1)}<small> km</small></span><div class="meta">últ. 8 sem.</div></div></div></div>`:`<div class="card"><p class="empty">Ainda não há corridas no seu Intervals. Sem problema: o plano começa leve.</p></div>`}
     <button class="b pri full" style="margin-top:6px" onclick="obGo(1)">Começar</button>`}
-  if(s.id==='relogio')h+=`${CFG.key?'':'<div style="text-align:center;margin:8px 0 14px"><img src="logo.svg" alt="" style="height:90px"></div>'}<div class="obh">Você usa relógio de corrida?</div><p class="obp">${CFG.key?'Serve para saber se o app pode mandar o treino direto para o pulso.':'Bem-vindo ao Boonie Run! Com essa resposta o app já sabe como montar tudo para você.'}</p>${o('relogio','garmin','Sim, Garmin','O treino vai direto para o relógio')}${o('relogio','outro','Sim, outra marca','Você segue o treino pela tela do app')}${o('relogio','nenhum','Não uso relógio','Você segue o treino e grava a corrida pelo celular')}`;
+  if(s.id==='relogio')h+=`${temConta()?'':'<div style="text-align:center;margin:8px 0 14px"><img src="logo.svg" alt="" style="height:90px"></div>'}<div class="obh">Você usa relógio de corrida?</div><p class="obp">${temConta()?'Serve para saber se o app pode mandar o treino direto para o pulso.':'Bem-vindo ao Boonie Run! Com essa resposta o app já sabe como montar tudo para você.'}</p>${o('relogio','garmin','Sim, Garmin','O treino vai direto para o relógio')}${o('relogio','outro','Sim, outra marca','Você segue o treino pela tela do app')}${o('relogio','nenhum','Não uso relógio','Você segue o treino e grava a corrida pelo celular')}`;
   if(s.id==='meta')h+=`<div class="obh">Qual é o seu objetivo?</div><p class="obp">O plano vai até a data da meta. Depois é só montar o próximo.</p>${o('meta','c','Criar constância','Correr com regularidade · 8 semanas')}${o('meta','5','Correr 5 km','8 semanas')}${o('meta','10','Correr 10 km','10 semanas')}${o('meta','21','Meia maratona (21 km)','16 semanas')}`;
   if(s.id==='dias')h+=`<div class="obh">Em quais dias você pode correr?</div><p class="obp">Escolha pelo menos 2. Para quem está começando ou voltando, 3 dias é o ideal.</p><div class="chips">${ORD.map(d=>`<button class="${a.dias.includes(d)?'on':''}" onclick="obDia(${d})">${DOW[d]}</button>`).join('')}</div><p class="meta" style="margin-top:10px">${a.dias.length} ${a.dias.length===1?'dia':'dias'} por semana</p><button class="b pri full" style="margin-top:16px" ${a.dias.length<2?'disabled':''} onclick="obGo(1)">Continuar</button>`;
   if(s.id==='longo')h+=`<div class="obh">Em qual dia fica o treino mais longo?</div><p class="obp">O longão pede mais tempo livre. Costuma ser no fim de semana.</p>${ORD.filter(d=>a.dias.includes(d)).map(d=>o('longo',d,DNOME[d])).join('')}`;
@@ -1663,12 +1718,12 @@ function trimTrack(tr){
   return t.filter((_,i)=>i%st===0||i===t.length-1);
 }
 async function publishMine(force){
-  if(LS.get('comp',null)!=='sim'||!CFG.key)return;
+  if(LS.get('comp',null)!=='sim'||!temConta())return;
   const runs=D.acts.filter(a=>isRun(a)&&AX[a.id]&&AX[a.id].map).slice(0,150).map(a=>({id:a.id,date:a.date.slice(0,10),dist:Math.round(a.dist||0),mov:a.mov,best:bestsOf(a,AX[a.id].best),map:trimTrack(AX[a.id].map)})).filter(r=>r.map);
   const foto=await fotoMini();
   const xp=meuXp(),sig=runs.length+'|'+(runs[0]&&runs[0].id)+'|'+runs.reduce((s,r)=>s+r.dist,0)+'|'+foto.length+'|'+xp;
   if(!force&&sig===LS.get('pubh',''))return;
-  const r=await fetch(PUBURL+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({athlete:CFG.athlete,key:CFG.key,runs,foto,xp})});
+  const r=await fetch(PUBURL+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...credSrv(),runs,foto,xp})});
   if(!r.ok)throw new Error('HTTP '+r.status);
   LS.set('pubh',sig);
 }
@@ -1733,8 +1788,8 @@ window.locateMe=(fly,init)=>{
 // amigos: o pedido vai pelo ID do Intervals e só vale depois que o outro aceita (o servidor guarda a lista)
 let FR=LS.get('frs',{friends:[],inc:[],out:[],pessoas:{}});
 async function frCall(acao,alvo){
-  if(!CFG.key||!CFG.athlete)throw new Error('sem conexão com o Intervals');
-  const r=await fetch(PUBURL+'/amigos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({athlete:CFG.athlete,key:CFG.key,acao,alvo})});
+  if(!temConta())throw new Error('sem conexão com o Intervals');
+  const r=await fetch(PUBURL+'/amigos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...credSrv(),acao,alvo})});
   const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.erro||('HTTP '+r.status));
   FR={friends:j.friends||[],inc:j.inc||[],out:j.out||[],pessoas:j.pessoas||{}};LS.set('frs',FR);return j;
 }
@@ -1830,7 +1885,7 @@ window.compSet=async(v,upd)=>{
   const era=LS.get('comp',null);LS.set('comp',v);closeSheet();
   try{
     if(v==='sim'){toast('PUBLICANDO SUAS MARCAS…');await publishMine(1);toast(upd?'MARCAS ATUALIZADAS':'VOCÊ ESTÁ NO RANKING')}
-    else if(era==='sim'){await fetch(PUBURL+'/me',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({athlete:CFG.athlete,key:CFG.key})});LS.set('pubh','');toast('VOCÊ SAIU DO RANKING')}
+    else if(era==='sim'){await fetch(PUBURL+'/me',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify(credSrv())});LS.set('pubh','');toast('VOCÊ SAIU DO RANKING')}
     await pullAll();
   }catch(e){toast('SEM CONEXÃO COM O SERVIDOR // '+e.message,3500)}
   rComp();
@@ -2053,7 +2108,7 @@ function recDraw(){
     if(!RM._fixou){RM.jumpTo({center:c,zoom:16});RM._fixou=1}else if(recLive())RM.easeTo({center:c,duration:600})}
 }
 window.openRec=d=>{
-  if(!CFG.key)return toast('CONECTE O INTERVALS EM MAIS');
+  if(!temConta())return toast('CONECTE O INTERVALS EM MAIS');
   if(typeof d!=='string')d=null; // o botão vermelho chama sem data
   const el=$('#rec');
   if(!recLive()){const p=planOn(d||ymd(TODAY()));RSEL={p,modo:p&&status(p)!=='cumprido'?'treino':'livre'}}
@@ -2123,7 +2178,7 @@ function toGpx(name){
 }
 async function upGpx(name,gpx){
   const fd=new FormData();fd.append('file',new Blob([gpx],{type:'application/gpx+xml'}),'boonie-run.gpx');
-  const r=await fetch(`${API}/athlete/${CFG.athlete}/activities?name=${encodeURIComponent(name)}`,{method:'POST',headers:{Authorization:'Basic '+btoa('API_KEY:'+CFG.key)},body:fd});
+  const r=await fetch(`${API}/athlete/${CFG.athlete}/activities?name=${encodeURIComponent(name)}`,{method:'POST',headers:{Authorization:authH()},body:fd});
   if(!r.ok)throw new Error('HTTP '+r.status);
 }
 window.recSave=async()=>{
@@ -2171,7 +2226,7 @@ function groupBlocks(el){const K=[...el.children];if(!K.length||K[0].classList.c
   for(const k of K){if(!b||k.classList.contains('sec')){b=document.createElement('div');b.className='blk';el.insertBefore(b,k)}b.appendChild(k)}}
 function render(){
   const ob=needOB();document.body.classList.toggle('ob',ob);
-  const fab=$('#recfab');fab.classList.toggle('on',!ob&&!!CFG.key&&(VIEW==='ini'||recLive())&&!$('#rec').classList.contains('on'));fab.classList.toggle('live',recLive());
+  const fab=$('#recfab');fab.classList.toggle('on',!ob&&temConta()&&(VIEW==='ini'||recLive())&&!$('#rec').classList.contains('on'));fab.classList.toggle('live',recLive());
   if(ob){document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-ini'));$('#ttl').textContent='BOAS-VINDAS';rOB();return}
   if(VIEW==='ini'||!$('#v-'+VIEW).classList.contains('on'))go2(VIEW);
   $('#ttl').textContent=TITLES[VIEW];
@@ -2183,7 +2238,7 @@ function render(){
 }
 window.sync=sync;window.sendWatch=sendWatch;
 render();
-if(CFG.key&&(!D.at||Date.now()-D.at>30*60e3))sync(0);
+voltaOAuth().then(v=>{if(!v&&temConta()&&(!D.at||Date.now()-D.at>30*60e3))sync(0)});
 </script>
 </body>
 </html>
