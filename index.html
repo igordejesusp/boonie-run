@@ -29,7 +29,6 @@ try{if(JSON.parse(localStorage.getItem('br.tema')||'"dark"')==='light')document.
 :root[data-theme="light"] #top .brand b{color:#fff}:root[data-theme="light"] #top .brand small{color:#9aa7b4}
 :root[data-theme="light"] #top .b{background:#26313d;border-color:#3a4654;color:#fff}
 :root[data-theme="light"] #av i{border-color:#1d2733}
-:root[data-theme="light"] body.ob .view img[src="logo.png"]{mix-blend-mode:multiply;filter:invert(1)}
 :root[data-theme="light"] .card,:root[data-theme="light"] .day,:root[data-theme="light"] .badge{box-shadow:0 1px 2px rgba(20,40,60,.06)}
 #tema{width:38px;height:38px;flex:none;border:0;background:none;color:#aab4bf;padding:0;display:flex;align-items:center;justify-content:center}
 #tema svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
@@ -40,7 +39,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 #top{position:absolute;top:0;left:0;right:0;z-index:9;background:linear-gradient(var(--panel),var(--hd2));border-bottom:1px solid var(--line);padding:calc(8px + env(safe-area-inset-top)) 12px 8px;display:flex;align-items:center;gap:10px}
 #top .brand{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
-#top .brand img{height:34px;mix-blend-mode:screen}
+#top .brand img{height:34px}
 #top .brand b{color:var(--hi);letter-spacing:.16em;font-size:14px;white-space:nowrap}
 #top .brand small{color:var(--dim);letter-spacing:.1em;font-size:9px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #av{position:relative;width:40px;height:40px;border-radius:50%;border:1px solid var(--blue);padding:2px;background:none;flex:none}
@@ -237,10 +236,10 @@ select{min-height:44px}
 </head>
 <body>
 <header id="top">
-  <div class="brand"><img src="logo.png" alt=""><div><b id="ttl">INÍCIO</b><small>BOONIE RUN</small></div></div>
+  <div class="brand"><img src="logo.svg" alt=""><div><b id="ttl">INÍCIO</b><small>BOONIE RUN</small></div></div>
   <button id="sync" class="b sm" title="Sincronizar">SYNC</button>
   <button id="tema" onclick="togTema()" aria-label="Trocar tema"></button>
-  <button id="av" aria-label="Perfil"><img id="avimg" src="logo.png" alt=""><i id="avst"></i></button>
+  <button id="av" aria-label="Perfil"><img id="avimg" src="logo.svg" alt=""><i id="avst"></i></button>
 </header>
 
 <main>
@@ -1299,7 +1298,7 @@ function rOB(){
     h+=`<div class="obh">Vamos montar o seu plano${nm?', '+esc(nm):''}</div><p class="obp">São poucas perguntas rápidas. Com as respostas e o seu histórico, o app monta os treinos semana a semana.</p>
     ${H.n?`<div class="card"><div class="lbl">Seu histórico no Intervals</div><div class="grid g3" style="margin-top:6px"><div class="cell"><div class="lbl">Corridas</div><span class="num">${H.n}</span></div><div class="cell"><div class="lbl">Km/semana</div><span class="num">${H.w4.toFixed(1)}</span><div class="meta">últ. 4 sem.</div></div><div class="cell"><div class="lbl">Maior</div><span class="num">${H.L.toFixed(1)}<small> km</small></span><div class="meta">últ. 8 sem.</div></div></div></div>`:`<div class="card"><p class="empty">Ainda não há corridas no seu Intervals. Sem problema: o plano começa leve.</p></div>`}
     <button class="b pri full" style="margin-top:6px" onclick="obGo(1)">Começar</button>`}
-  if(s.id==='relogio')h+=`${CFG.key?'':'<div style="text-align:center;margin:8px 0 14px"><img src="logo.png" alt="" style="height:90px;mix-blend-mode:screen"></div>'}<div class="obh">Você usa relógio de corrida?</div><p class="obp">${CFG.key?'Serve para saber se o app pode mandar o treino direto para o pulso.':'Bem-vindo ao Boonie Run! Com essa resposta o app já sabe como montar tudo para você.'}</p>${o('relogio','garmin','Sim, Garmin','O treino vai direto para o relógio')}${o('relogio','outro','Sim, outra marca','Você segue o treino pela tela do app')}${o('relogio','nenhum','Não uso relógio','Você segue o treino e grava a corrida pelo celular')}`;
+  if(s.id==='relogio')h+=`${CFG.key?'':'<div style="text-align:center;margin:8px 0 14px"><img src="logo.svg" alt="" style="height:90px"></div>'}<div class="obh">Você usa relógio de corrida?</div><p class="obp">${CFG.key?'Serve para saber se o app pode mandar o treino direto para o pulso.':'Bem-vindo ao Boonie Run! Com essa resposta o app já sabe como montar tudo para você.'}</p>${o('relogio','garmin','Sim, Garmin','O treino vai direto para o relógio')}${o('relogio','outro','Sim, outra marca','Você segue o treino pela tela do app')}${o('relogio','nenhum','Não uso relógio','Você segue o treino e grava a corrida pelo celular')}`;
   if(s.id==='meta')h+=`<div class="obh">Qual é o seu objetivo?</div><p class="obp">O plano vai até a data da meta. Depois é só montar o próximo.</p>${o('meta','c','Criar constância','Correr com regularidade · 8 semanas')}${o('meta','5','Correr 5 km','8 semanas')}${o('meta','10','Correr 10 km','10 semanas')}${o('meta','21','Meia maratona (21 km)','16 semanas')}`;
   if(s.id==='dias')h+=`<div class="obh">Em quais dias você pode correr?</div><p class="obp">Escolha pelo menos 2. Para quem está começando ou voltando, 3 dias é o ideal.</p><div class="chips">${ORD.map(d=>`<button class="${a.dias.includes(d)?'on':''}" onclick="obDia(${d})">${DOW[d]}</button>`).join('')}</div><p class="meta" style="margin-top:10px">${a.dias.length} ${a.dias.length===1?'dia':'dias'} por semana</p><button class="b pri full" style="margin-top:16px" ${a.dias.length<2?'disabled':''} onclick="obGo(1)">Continuar</button>`;
   if(s.id==='longo')h+=`<div class="obh">Em qual dia fica o treino mais longo?</div><p class="obp">O longão pede mais tempo livre. Costuma ser no fim de semana.</p>${ORD.filter(d=>a.dias.includes(d)).map(d=>o('longo',d,DNOME[d])).join('')}`;
@@ -1554,14 +1553,14 @@ window.bOrig=()=>{const ex=LS.get('extra',{});delete ex[BD.orig];LS.set('extra',
 let CM=null,CP={i:0,d:0},PLC=[];
 const MODO=()=>LS.get('mmode','g'); // 'a' = só amigos, 'g' = geral
 const CDIST=[[1000,'1 KM'],[3000,'3 KM'],[5000,'5 KM'],[10000,'10 KM'],[21097.5,'21 KM']];
-const myPic=()=>LS.get('foto',null)||(D.athlete||{}).pic||'logo.png';
+const myPic=()=>LS.get('foto',null)||(D.athlete||{}).pic||'logo.svg';
 const dM=(p,q)=>Math.hypot((p[0]-q[0])*111320,(p[1]-q[1])*111320*Math.cos(p[0]*Math.PI/180));
 const cen=tr=>{let a=0,b=0;for(const q of tr){a+=q[0];b+=q[1]}return [a/tr.length,b/tr.length]};
 function bestsOf(a,b0){const b={...(b0||{})};for(const [d] of CDIST)if(a.dist>=d*0.99&&a.dist<=d*1.05&&a.mov){const t=Math.round(a.mov*d/a.dist);if(!b[d]||t<b[d])b[d]=t}return b}
 function people(){
   const me={id:CFG.athlete,name:((D.athlete||{}).name||'Você'),pic:myPic(),me:1,
     runs:D.acts.filter(a=>isRun(a)&&AX[a.id]&&AX[a.id].map).map(a=>({id:a.id,date:a.date,dist:a.dist,mov:a.mov,best:bestsOf(a,AX[a.id].best),map:AX[a.id].map}))};
-  return [me,...PUBL.filter(u=>u.id!==CFG.athlete&&u.runs&&u.runs.length&&(MODO()==='g'||FR.friends.includes(u.id))).map(u=>({id:u.id,name:u.name||u.id,pic:u.pic||'logo.png',runs:u.runs}))];
+  return [me,...PUBL.filter(u=>u.id!==CFG.athlete&&u.runs&&u.runs.length&&(MODO()==='g'||FR.friends.includes(u.id))).map(u=>({id:u.id,name:u.name||u.id,pic:u.pic||'logo.svg',runs:u.runs}))];
 }
 function buildPlaces(P){
   const L=[];
@@ -1683,7 +1682,7 @@ async function frCall(acao,alvo){
   FR={friends:j.friends||[],inc:j.inc||[],out:j.out||[],pessoas:j.pessoas||{}};LS.set('frs',FR);return j;
 }
 const frNome=id=>{const u=PUBL.find(x=>x.id===id);return (u&&u.name)||(FR.pessoas[id]||{}).name||id};
-const frPic=id=>{const u=PUBL.find(x=>x.id===id);return (u&&u.pic)||(FR.pessoas[id]||{}).pic||'logo.png'};
+const frPic=id=>{const u=PUBL.find(x=>x.id===id);return (u&&u.pic)||(FR.pessoas[id]||{}).pic||'logo.svg'};
 window.openAmigos=nofetch=>{
   const row=(id,mid,btns)=>`<div class="row" style="flex-wrap:nowrap;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2)">${avatar({pic:frPic(id)},34)}<span style="flex:1;min-width:0" ${mid}><b style="display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(frNome(id))}</b><span class="meta">${frNome(id)===id?'ainda não abriu o Mapa':esc(id)}</span></span>${btns}</div>`;
   const sec=(t,l)=>l.length?`<div class="sec">${t}</div><div class="card" style="padding:4px 12px">${l.join('')}</div>`:'';
