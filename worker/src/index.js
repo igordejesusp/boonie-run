@@ -107,7 +107,10 @@ export default {
         return json(req, { ok: true });
       }
       const runs = Array.isArray(b.runs) ? b.runs.slice(0, 200) : [];
-      const reg = { id: b.athlete, name: a.name || b.athlete, pic: a.profile_medium || '', sex: a.sex || '', runs, at: Date.now() };
+      // foto: a escolhida no app (JPEG pequeno) ou a do Intervals; "/no-profile-pic.png" (sem foto) vira vazio
+      const foto = typeof b.foto === 'string' && b.foto.length < 40000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(b.foto) ? b.foto : '';
+      const doIcu = /^https:\/\//.test(a.profile_medium || '') ? a.profile_medium : '';
+      const reg = { id: b.athlete, name: a.name || b.athlete, pic: foto || doIcu, sex: a.sex || '', runs, at: Date.now() };
       await env.BR.put('a:' + b.athlete, JSON.stringify(reg));
       return json(req, { ok: true, runs: runs.length });
     }
