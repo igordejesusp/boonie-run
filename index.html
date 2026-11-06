@@ -151,7 +151,7 @@ svg.ch{width:100%;display:block}
 .feel{display:flex;gap:6px}
 .feel button{flex:1;min-height:44px;background:var(--cell);border:1px solid var(--line);border-radius:6px;font-family:var(--m);color:var(--dim)}
 .feel button.on{border-color:var(--blue);color:var(--blue);background:var(--sel)}
-.map{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}.map .mimg{position:absolute;inset:0;width:100%;height:100%;display:block}.map span{position:absolute;right:6px;bottom:3px;z-index:2;font-size:8px;color:var(--dim2);letter-spacing:.02em}
+.map{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}.map .mimg{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover}.map span{position:absolute;right:6px;bottom:3px;z-index:2;font-size:8px;color:var(--dim2);letter-spacing:.02em}
 #recfab{position:absolute;z-index:8;right:16px;bottom:calc(74px + env(safe-area-inset-bottom));height:58px;min-width:58px;border-radius:29px;background:var(--glass);border:1px solid var(--blue);display:none;align-items:center;justify-content:center;gap:9px;padding:0 17px;box-shadow:0 6px 22px rgba(0,0,0,.7)}
 #recfab.on{display:flex}#recfab i{width:20px;height:20px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px rgba(224,68,47,.22);flex:none}
 #recfab span{display:none;font-family:var(--m);font-size:14px;color:var(--hi);font-weight:600}#recfab.live{right:auto;left:50%;transform:translateX(-50%)}#recfab.live span{display:inline}#recfab.live i{animation:pl 1.2s infinite}@keyframes pl{50%{opacity:.3}}
@@ -271,14 +271,11 @@ select{min-height:44px}
 .sec:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--blue);margin-right:8px;flex:none}
 .sec>small,.sec>button,.sec>span~*{margin-left:auto}
 #top{gap:6px}#top .brand img{height:30px}#top .brand b{font-size:13px;letter-spacing:.05em}
-#appnm{position:absolute;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top));height:40px;display:flex;align-items:center;font:700 10px var(--m);letter-spacing:.18em;color:var(--hi);white-space:nowrap;pointer-events:none}
-:root[data-theme="light"] #appnm{color:#fff}
-#sync{width:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center}
+:root[data-theme="light"] #sync{width:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center}
 #sync svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 #sync.gira svg{animation:sp 1s linear infinite}
-@media (max-width:349px){#appnm{display:none}}
-body.ob #appnm{display:none}
-.lvl{width:54px;height:54px;flex:none;border-radius:50%;background:var(--blue);color:var(--onblue);display:grid;place-items:center;font:800 22px var(--m)}
+@media (max-width:349px){}
+body.ob .lvl{width:54px;height:54px;flex:none;border-radius:50%;background:var(--blue);color:var(--onblue);display:grid;place-items:center;font:800 22px var(--m)}
 .card.tap{cursor:pointer}
 /* aba ativa marcada por uma bolinha azul */
 #tabbar button{position:relative}
@@ -289,7 +286,6 @@ body.ob #appnm{display:none}
 <body>
 <header id="top">
   <div class="brand"><img src="logo.svg" alt=""><b id="ttl">INÍCIO</b></div>
-  <div id="appnm">BOONIE RUN</div>
   <button id="sync" class="b sm" title="Sincronizar" aria-label="Sincronizar"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg></button>
   <button id="tema" onclick="togTema()" aria-label="Trocar tema"></button>
   <button id="av" aria-label="Perfil"><img id="avimg" src="logo.svg" alt=""><i id="avst"></i></button>
@@ -726,15 +722,18 @@ function mlLoad(){
         {id:'bn_parque',type:'fill',source:'openmaptiles','source-layer':'park',paint:{'fill-color':T.parque,'fill-opacity':.9}});
       return st}).catch(e=>{_ml[t]=null;throw e});
 }
-const mapBox=(id,H)=>{const im=MAPIMG[id+'_'+H+TEMA()];return `<div class="map" data-map="${id}" data-h="${H}" style="height:${H}px">${im?`<img class="mimg" src="${im}" alt="">`:''}<span>© OpenFreeMap · OpenStreetMap</span></div>`};
+const mapBox=(id,H)=>{const im=(MAPIMG[id+'_'+H+TEMA()]||{}).src;return `<div class="map" data-map="${id}" data-h="${H}" style="height:${H}px">${im?`<img class="mimg" src="${im}" alt="">`:''}<span>© OpenFreeMap · OpenStreetMap</span></div>`};
 function drawMaps(){
   document.querySelectorAll('.map[data-map]:not(.ok)').forEach(async el=>{
+    // só tira a foto do mapa com o cartão visível e no tamanho certo; escondido (outra aba) tenta de novo depois
+    const W=el.clientWidth;if(W<40)return;
     el.classList.add('ok');const id=el.dataset.map,key=id+'_'+el.dataset.h+TEMA(),tr=(AX[id]||{}).map;
-    if(MAPIMG[key]||!tr)return;
+    if(!tr||(MAPIMG[key]&&Math.abs(MAPIMG[key].w-W)<=4))return;
+    el.querySelectorAll('.mimg').forEach(x=>x.remove());
     try{
       const st=await mlLoad(),box=document.createElement('div');box.style.cssText='position:absolute;inset:0';el.prepend(box);
       const ll=tr.map(p=>[p[1],p[0]]),b=ll.reduce((b,p)=>b.extend(p),new maplibregl.LngLatBounds(ll[0],ll[0]));
-      const m=new maplibregl.Map({container:box,style:st,interactive:false,attributionControl:false,preserveDrawingBuffer:true,fadeDuration:0,bounds:b,fitBoundsOptions:{padding:{top:24,bottom:24,left:28,right:28},maxZoom:17}});
+      const m=new maplibregl.Map({container:box,style:structuredClone(st),interactive:false,pitch:0,bearing:0,maxPitch:0,attributionControl:false,preserveDrawingBuffer:true,fadeDuration:0,bounds:b,fitBoundsOptions:{padding:{top:24,bottom:24,left:28,right:28},maxZoom:17}});
       m.on('load',()=>{
         m.addSource('rt',{type:'geojson',data:{type:'Feature',geometry:{type:'LineString',coordinates:ll}}});
         m.addSource('pt',{type:'geojson',data:{type:'FeatureCollection',features:[ll[0],ll[ll.length-1]].map((c,i)=>({type:'Feature',properties:{f:i},geometry:{type:'Point',coordinates:c}}))}});
@@ -742,8 +741,8 @@ function drawMaps(){
         m.addLayer({id:'rt0',type:'line',source:'rt',layout:lay,paint:{'line-color':TM[TEMA()].sob,'line-opacity':.6,'line-width':7}});
         m.addLayer({id:'rt1',type:'line',source:'rt',layout:lay,paint:{'line-color':'#4a9eff','line-width':3.5}});
         m.addLayer({id:'pt',type:'circle',source:'pt',paint:{'circle-radius':5,'circle-color':['case',['==',['get','f'],0],'#fff','#4a9eff'],'circle-stroke-width':2.5,'circle-stroke-color':['case',['==',['get','f'],0],'#4a9eff','#fff']}});
-        m.once('idle',()=>{MAPIMG[key]=m.getCanvas().toDataURL('image/png');m.remove();box.remove();
-          if(!el.isConnected)return;const im=new Image();im.className='mimg';im.alt='';im.src=MAPIMG[key];el.prepend(im)});
+        m.once('idle',()=>{MAPIMG[key]={src:m.getCanvas().toDataURL('image/png'),w:W};m.remove();box.remove();
+          if(!el.isConnected)return;const im=new Image();im.className='mimg';im.alt='';im.src=MAPIMG[key].src;el.prepend(im)});
       });
     }catch(e){el.classList.add('err')}
   });
@@ -1770,7 +1769,7 @@ function rComp(){
   mlLoad().then(st=>{
     if(CM){CM.resize();if(CM.isStyleLoaded()&&CM.getSource('trk')){CM.getSource('trk').setData(lines);drawPins()}return}
     const lp=LS.get('lastpos',null);
-    CM=new maplibregl.Map({container:'cmap',style:structuredClone(st),center:lp||(PLC.length?[PLC[0].c[1],PLC[0].c[0]]:[-48.277,-18.918]),zoom:lp?14.5:13,dragRotate:false,pitchWithRotate:false,attributionControl:{compact:true,customAttribution:'OpenFreeMap'}});
+    CM=new maplibregl.Map({container:'cmap',style:structuredClone(st),center:lp||(PLC.length?[PLC[0].c[1],PLC[0].c[0]]:[-48.277,-18.918]),zoom:lp?14.5:13,dragRotate:false,pitchWithRotate:false,maxPitch:0,attributionControl:{compact:true,customAttribution:'OpenFreeMap'}});
     CM.touchZoomRotate.disableRotation();
     CM.on('load',()=>{
       const d=compData();
@@ -2134,7 +2133,7 @@ window.openRec=d=>{
   clearInterval(RTK);RTK=setInterval(recUI,1000);recUI();
   mlLoad().then(st=>{
     if(RM){RM.resize();recDraw();return}
-    RM=new maplibregl.Map({container:'rmap',style:structuredClone(st),center:FIX?[FIX.ll[1],FIX.ll[0]]:[-48.277,-18.918],zoom:FIX?16:12,dragRotate:false,pitchWithRotate:false,attributionControl:{compact:true,customAttribution:'OpenFreeMap'}});
+    RM=new maplibregl.Map({container:'rmap',style:structuredClone(st),center:FIX?[FIX.ll[1],FIX.ll[0]]:[-48.277,-18.918],zoom:FIX?16:12,dragRotate:false,pitchWithRotate:false,maxPitch:0,attributionControl:{compact:true,customAttribution:'OpenFreeMap'}});
     RM.on('load',()=>{
       RM.addSource('rt',{type:'geojson',data:{type:'Feature',geometry:{type:'MultiLineString',coordinates:[]}}});RM.addSource('me',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
       RM.addLayer({id:'rt0',type:'line',source:'rt',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':TM[TEMA()].sob,'line-opacity':.6,'line-width':8}});
